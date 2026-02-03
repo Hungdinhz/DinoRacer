@@ -39,3 +39,5 @@ ai_handler.py: Đây là điểm mấu chốt để "dễ nâng cấp". Bạn t�
 4. main.py:
 
 File này chỉ nên làm nhiệm vụ khởi tạo và gọi các module khác chạy. Code trong này càng ngắn càng tốt.
+
+
