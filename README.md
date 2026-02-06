@@ -1,5 +1,5 @@
+```
 DinoRacer/
-│
 ├── assets/                 # Chứa toàn bộ tài nguyên game (KHÔNG chứa code)
 │   ├── images/             # Ảnh: khủng long, xương rồng, chim, đất...
 │   ├── sounds/             # Âm thanh: tiếng nhảy, game over...
@@ -7,18 +7,19 @@ DinoRacer/
 │
 ├── config/                 # Chứa các file cấu hình
 │   ├── neat-config.txt     # File cấu hình quan trọng cho AI (NEAT)
-│   └── settings.py         # Các hằng số: Kích thước màn hình, FPS, màu sắc...
+│   └── settings.py         # Các hằng số: kích thước màn hình, FPS, màu sắc...
 │
 ├── src/                    # Source code chính (Logic game)
 │   ├── __init__.py
 │   ├── dino.py             # Class Dino (xử lý nhảy, cúi, vẽ hình)
 │   ├── obstacle.py         # Class Chướng ngại vật (Cactus, Bird...)
 │   ├── game_manager.py     # Quản lý vòng lặp game, tính điểm, va chạm
-│   └── ai_handler.py       # Xử lý riêng phần thuật toán NEAT (load config, run generation)
+│   └── ai_handler.py       # Xử lý thuật toán NEAT (AI)
 │
 ├── main.py                 # File chạy chính của chương trình
-├── requirements.txt        # Liệt kê thư viện (pygame, neat-python...)
-└── README.md               # Hướng dẫn chạy game
+├── requirements.txt        # Danh sách thư viện cần cài
+└── README.md               # File hướng dẫn
+```
 
 1. assets/ (Tài nguyên):
 
