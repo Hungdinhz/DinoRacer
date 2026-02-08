@@ -6,6 +6,7 @@ from config.settings import (
     DINO_X, DINO_WIDTH, DINO_HEIGHT, DINO_COLOR,
     GROUND_Y, GRAVITY, JUMP_VELOCITY, DUCK_HEIGHT_RATIO
 )
+from src.assets_loader import get_sprite, play_sound
 
 
 class Dino:
@@ -24,6 +25,7 @@ class Dino:
         if not self.is_jumping and not self.is_ducking:
             self.vel_y = JUMP_VELOCITY
             self.is_jumping = True
+            play_sound("jump")
 
     def duck(self, is_ducking: bool):
         """Cúi xuống hoặc đứng dậy"""
@@ -50,11 +52,14 @@ class Dino:
         return pygame.Rect(self.x, self.y + (self.height - h), self.width, h)
 
     def draw(self, screen):
-        """Vẽ khủng long lên màn hình"""
+        """Vẽ khủng long lên màn hình (sprite hoặc fallback vẽ tay)"""
         rect = self.get_rect()
-        pygame.draw.rect(screen, self.color, rect)
-        # Vẽ mắt
-        eye_x = self.x + self.width - 12
-        eye_y = self.y + 12 if not self.is_ducking else self.y + 8
-        pygame.draw.circle(screen, (255, 255, 255), (eye_x, eye_y), 4)
-        pygame.draw.circle(screen, (0, 0, 0), (eye_x + 1, eye_y), 2)
+        sprite = get_sprite("dino_duck" if self.is_ducking else "dino", (self.width, rect.height))
+        if sprite:
+            screen.blit(sprite, (rect.x, rect.y))
+        else:
+            pygame.draw.rect(screen, self.color, rect)
+            eye_x = self.x + self.width - 12
+            eye_y = self.y + 12 if not self.is_ducking else self.y + 8
+            pygame.draw.circle(screen, (255, 255, 255), (eye_x, eye_y), 4)
+            pygame.draw.circle(screen, (0, 0, 0), (eye_x + 1, eye_y), 2)

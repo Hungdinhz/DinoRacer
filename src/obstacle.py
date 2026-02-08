@@ -3,6 +3,7 @@ Class Chướng ngại vật - Cactus (xương rồng), Bird (chim)
 """
 import pygame
 import random
+from src.assets_loader import get_sprite
 from config.settings import (
     SCREEN_WIDTH, GROUND_Y,
     CACTUS_WIDTH, CACTUS_HEIGHT_SMALL, CACTUS_HEIGHT_LARGE, CACTUS_COLOR,
@@ -45,12 +46,15 @@ class Cactus(Obstacle):
 
     def draw(self, screen):
         rect = self.get_rect()
-        pygame.draw.rect(screen, CACTUS_COLOR, rect)
-        # Vẽ gai xương rồng đơn giản
-        for i in range(3):
-            pygame.draw.line(screen, (0, 100, 0),
-                             (self.x + 5 + i * 12, self.y),
-                             (self.x + 5 + i * 12, self.y + 20), 2)
+        sprite = get_sprite("cactus", (self.width, self.height))
+        if sprite:
+            screen.blit(sprite, rect)
+        else:
+            pygame.draw.rect(screen, CACTUS_COLOR, rect)
+            for i in range(3):
+                pygame.draw.line(screen, (0, 100, 0),
+                                 (self.x + 5 + i * 12, self.y),
+                                 (self.x + 5 + i * 12, self.y + 20), 2)
 
 
 class Bird(Obstacle):
@@ -68,10 +72,13 @@ class Bird(Obstacle):
 
     def draw(self, screen):
         rect = self.get_rect()
-        pygame.draw.ellipse(screen, BIRD_COLOR, rect)
-        # Mắt chim
-        pygame.draw.circle(screen, (255, 255, 255), (self.x + 35, self.y + 15), 5)
-        pygame.draw.circle(screen, (0, 0, 0), (self.x + 36, self.y + 15), 2)
+        sprite = get_sprite("bird", (self.width, self.height))
+        if sprite:
+            screen.blit(sprite, rect)
+        else:
+            pygame.draw.ellipse(screen, BIRD_COLOR, rect)
+            pygame.draw.circle(screen, (255, 255, 255), (self.x + 35, self.y + 15), 5)
+            pygame.draw.circle(screen, (0, 0, 0), (self.x + 36, self.y + 15), 2)
 
 
 def create_obstacle(x, speed):

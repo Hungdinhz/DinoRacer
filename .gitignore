@@ -37,3 +37,7 @@ htmlcov/
 # Environment variables (chứa thông tin nhạy cảm)
 .env
 .env.local
+
+# DinoRacer - Generated files
+best_genome.pkl
+highscore.json

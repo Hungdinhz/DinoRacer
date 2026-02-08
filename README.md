@@ -1,3 +1,13 @@
+## Cách chạy
+- `python main.py human`   – Chơi thủ công (Space=nhảy, ↓=cúi)
+- `python main.py ai`      – Train AI NEAT (lưu vào best_genome.pkl)
+- `python main.py ai-play` – Chạy AI đã lưu (không cần train lại)
+
+## Tính năng mới
+- **High score**: Lưu điểm cao nhất (human & AI) vào `highscore.json`
+- **Sprites & âm thanh**: Đặt file vào `assets/images/` và `assets/sounds/` – xem `assets/ASSETS_README.md`
+- **Save/Load AI**: Sau khi train, AI được lưu vào `best_genome.pkl` – chạy `ai-play` để dùng lại
+
 ```
 DinoRacer/
 ├── assets/                 # Chứa toàn bộ tài nguyên game (KHÔNG chứa code)

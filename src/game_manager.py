@@ -11,10 +11,12 @@ from config.settings import (
 )
 from src.dino import Dino
 from src.obstacle import create_obstacle
+from src.highscore import load_highscore, save_highscore
+from src.assets_loader import play_sound, CLOUD_POSITIONS
 
 
 class GameManager:
-    def __init__(self, screen):
+    def __init__(self, screen, is_ai_mode=False):
         self.screen = screen
         self.clock = pygame.time.Clock()
         self.dino = Dino()
@@ -24,6 +26,8 @@ class GameManager:
         self.last_obstacle_x = 0  # Cho phép spawn obstacle đầu tiên ngay
         self.running = True
         self.game_over = False
+        self.is_ai_mode = is_ai_mode
+        self.highscore_human, self.highscore_ai = load_highscore()
 
     def reset(self):
         """Reset game về trạng thái ban đầu"""
@@ -68,11 +72,14 @@ class GameManager:
         self.dino.update()
         self.spawn_obstacle()
 
+        prev_score = self.score
         for obs in self.obstacles:
             obs.update()
             if obs.x < self.dino.x and not obs.passed:
                 obs.passed = True
                 self.score += 1
+        if self.score // 100 > prev_score // 100 and self.score > 0:
+            play_sound("score")
 
         self.obstacles = [o for o in self.obstacles if not o.is_off_screen()]
         if self.obstacles:
@@ -84,6 +91,13 @@ class GameManager:
 
         if self.check_collision():
             self.game_over = True
+            play_sound("gameover")
+            h_cur = self.highscore_ai if self.is_ai_mode else self.highscore_human
+            if self.score > h_cur:
+                if self.is_ai_mode:
+                    save_highscore(ai=self.score)
+                else:
+                    save_highscore(human=self.score)
 
     def get_state(self):
         """
@@ -114,6 +128,10 @@ class GameManager:
     def draw(self):
         """Vẽ toàn bộ game"""
         self.screen.fill(BG_COLOR)
+        # Mây
+        for cx, cy in CLOUD_POSITIONS:
+            pygame.draw.ellipse(self.screen, (220, 220, 220), (cx, cy, 60, 30))
+            pygame.draw.ellipse(self.screen, (230, 230, 230), (cx + 20, cy - 5, 50, 25))
         # Mặt đất
         pygame.draw.line(self.screen, GROUND_COLOR, (0, GROUND_Y), (SCREEN_WIDTH, GROUND_Y), 3)
 
@@ -121,10 +139,16 @@ class GameManager:
         for obs in self.obstacles:
             obs.draw(self.screen)
 
-        # Điểm số
+        # Điểm số & High score
         font = pygame.font.Font(None, 36)
         text = font.render(f"Score: {self.score}", True, TEXT_COLOR)
-        self.screen.blit(text, (SCREEN_WIDTH - 150, 30))
+        self.screen.blit(text, (SCREEN_WIDTH - 150, 10))
+        h = max(
+            self.highscore_ai if self.is_ai_mode else self.highscore_human,
+            self.score
+        )
+        text_hs = font.render(f"HI: {h}", True, TEXT_COLOR)
+        self.screen.blit(text_hs, (SCREEN_WIDTH - 150, 40))
 
         if self.game_over:
             font_large = pygame.font.Font(None, 72)

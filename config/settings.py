@@ -40,3 +40,5 @@ MIN_OBSTACLE_SPAWN_DISTANCE = 600
 INITIAL_SCORE = 0
 SPEED_INCREASE_INTERVAL = 100  # Mỗi 100 điểm tăng tốc
 SPEED_INCREASE_AMOUNT = 0.5
+HIGHSCORE_FILE = "highscore.json"  # Lưu trong thư mục gốc project
+BEST_GENOME_FILE = "best_genome.pkl"  # AI genome đã train

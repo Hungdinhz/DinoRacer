@@ -2,8 +2,10 @@
 AI Handler - Xử lý thuật toán NEAT cho DinoRacer
 """
 import os
+import pickle
 import neat
 from config.settings import (
+    BEST_GENOME_FILE,
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS, BG_COLOR, GROUND_COLOR, GROUND_Y,
     INITIAL_SCORE, SPEED_INCREASE_INTERVAL, SPEED_INCREASE_AMOUNT,
     MIN_OBSTACLE_SPAWN_DISTANCE, OBSTACLE_SPEED_MIN, OBSTACLE_SPEED_MAX,
@@ -11,11 +13,45 @@ from config.settings import (
 )
 from src.dino import Dino
 from src.obstacle import create_obstacle
+from src.highscore import load_highscore, save_highscore
+from src.assets_loader import play_sound, CLOUD_POSITIONS
 
 
 def get_config_path():
     """Đường dẫn đến file config NEAT"""
     return os.path.join(os.path.dirname(__file__), '..', 'config', 'neat-config.txt')
+
+
+def get_genome_path():
+    """Đường dẫn file lưu genome"""
+    return os.path.join(os.path.dirname(__file__), '..', BEST_GENOME_FILE)
+
+
+def save_genome(genome):
+    """Lưu genome ra file"""
+    path = get_genome_path()
+    try:
+        with open(path, "wb") as f:
+            pickle.dump(genome, f)
+        return True
+    except (IOError, pickle.PickleError):
+        return False
+
+
+def load_genome():
+    """Tải genome từ file, trả về (genome, config) hoặc (None, None)"""
+    path = get_genome_path()
+    try:
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                genome = pickle.load(f)
+            config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                get_config_path())
+            return genome, config
+    except (IOError, pickle.PickleError, Exception):
+        pass
+    return None, None
 
 
 def eval_genome(genome, config):
@@ -118,6 +154,8 @@ def run_neat_training(generations=50):
     population.add_reporter(stats)
 
     winner = population.run(eval_genomes, generations)
+    if winner and save_genome(winner):
+        print(f"Đã lưu AI vào {get_genome_path()}")
     return winner
 
 
@@ -136,6 +174,7 @@ def run_best_genome_display(genome, config):
     game_speed = OBSTACLE_SPEED_MIN
     last_obstacle_x = SCREEN_WIDTH
     game_over = False
+    _, highscore_ai = load_highscore()
 
     running = True
     while running:
@@ -197,9 +236,15 @@ def run_best_genome_display(genome, config):
             for obs in obstacles:
                 if dino_rect.colliderect(obs.get_rect()):
                     game_over = True
+                    play_sound("gameover")
+                    if score > highscore_ai:
+                        save_highscore(ai=score)
                     break
 
         screen.fill(BG_COLOR)
+        for cx, cy in CLOUD_POSITIONS:
+            pygame.draw.ellipse(screen, (220, 220, 220), (cx, cy, 60, 30))
+            pygame.draw.ellipse(screen, (230, 230, 230), (cx + 20, cy - 5, 50, 25))
         pygame.draw.line(screen, GROUND_COLOR, (0, GROUND_Y), (SCREEN_WIDTH, GROUND_Y), 3)
         dino.draw(screen)
         for obs in obstacles:
@@ -207,7 +252,10 @@ def run_best_genome_display(genome, config):
 
         font = pygame.font.Font(None, 36)
         text = font.render(f"Score: {score}", True, TEXT_COLOR)
-        screen.blit(text, (SCREEN_WIDTH - 150, 30))
+        screen.blit(text, (SCREEN_WIDTH - 150, 10))
+        hi = max(highscore_ai, score)
+        text_hi = font.render(f"HI: {hi}", True, TEXT_COLOR)
+        screen.blit(text_hi, (SCREEN_WIDTH - 150, 40))
 
         if game_over:
             font_large = pygame.font.Font(None, 72)
