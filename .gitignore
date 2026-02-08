@@ -41,3 +41,6 @@ htmlcov/
 # DinoRacer - Generated files
 best_genome.pkl
 highscore.json
+
+# Docs - Chỉ đọc local, không đẩy lên git
+docs/
