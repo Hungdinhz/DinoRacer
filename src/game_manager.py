@@ -184,4 +184,5 @@ class GameManager:
             self.draw()
             self.clock.tick(FPS)
 
-        pygame.quit()
+        #pygame.quit()
+        # Hàm này chỉ cần kết thúc (return) để quay về main.py, đừng tắt Pygame.
