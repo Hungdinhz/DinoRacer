@@ -1,0 +1,44 @@
+"""
+Cấu hình game DinoRacer - Các hằng số toàn cục
+"""
+
+# === Màn hình ===
+SCREEN_WIDTH = 1100
+SCREEN_HEIGHT = 600
+FPS = 60
+
+# === Màu sắc ===
+BG_COLOR = (255, 255, 255)
+GROUND_COLOR = (83, 83, 83)
+DINO_COLOR = (83, 83, 83)
+CACTUS_COLOR = (0, 150, 0)
+BIRD_COLOR = (200, 0, 0)
+TEXT_COLOR = (83, 83, 83)
+
+# === Vật lý ===
+GROUND_Y = 450
+GRAVITY = 0.8
+JUMP_VELOCITY = -16
+DUCK_HEIGHT_RATIO = 0.6  # Tỉ lệ chiều cao khi cúi
+
+# === Dino ===
+DINO_WIDTH = 44
+DINO_HEIGHT = 47
+DINO_X = 80
+
+# === Chướng ngại vật ===
+CACTUS_WIDTH = 34
+CACTUS_HEIGHT_SMALL = 70
+CACTUS_HEIGHT_LARGE = 100
+BIRD_WIDTH = 46
+BIRD_HEIGHT = 40
+OBSTACLE_SPEED_MIN = 8
+OBSTACLE_SPEED_MAX = 14
+MIN_OBSTACLE_SPAWN_DISTANCE = 600
+
+# === Game ===
+INITIAL_SCORE = 0
+SPEED_INCREASE_INTERVAL = 100  # Mỗi 100 điểm tăng tốc
+SPEED_INCREASE_AMOUNT = 0.5
+HIGHSCORE_FILE = "highscore.json"  # Lưu trong thư mục gốc project
+BEST_GENOME_FILE = "best_genome.pkl"  # AI genome đã train
