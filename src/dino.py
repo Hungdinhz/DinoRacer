@@ -53,6 +53,11 @@ class Dino:
         if not self.is_jumping:
             self.is_ducking = is_ducking
 
+    def set_duck(self, should_duck: bool):
+        """Đặt trạng thái cúi - AI dùng hàm này thay vì duck()"""
+        if not self.is_jumping:
+            self.is_ducking = should_duck
+
     def update(self):
         if self.is_jumping:
             self.vel_y += GRAVITY
@@ -90,7 +95,7 @@ class Dino:
             f"{self.folder}/{anim}.png",
             num_frames,
             self.width,
-            rect.height
+            self.height
         )
 
         if frames:

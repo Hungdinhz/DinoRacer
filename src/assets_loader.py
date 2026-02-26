@@ -73,6 +73,12 @@ def load_sprite_sheet_sized(filename, num_frames, target_w, target_h):
 _sheet_cache = {}
 
 
+def clear_sheet_cache():
+    """Xóa cache sprite sheets - dùng khi thay đổi kích thước."""
+    global _sheet_cache
+    _sheet_cache = {}
+
+
 def get_sheet(filename, num_frames, target_w, target_h):
     """Lấy frames từ sprite sheet, cache kết quả."""
     key = (filename, num_frames, target_w, target_h)

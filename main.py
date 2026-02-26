@@ -10,12 +10,16 @@ from src.ai_handler import (
     get_config_path,
     load_genome,
 )
+from src.assets_loader import clear_sheet_cache
 
 def main():
     # 1. Khởi tạo Pygame MỘT LẦN DUY NHẤT ở đầu chương trình
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("DinoRacer Ultimate")
+
+    # Xóa cache sprite để load lại với kích thước mới
+    clear_sheet_cache()
 
     # 2. Vòng lặp chính của ứng dụng
     while True:
@@ -24,15 +28,12 @@ def main():
         choice = menu.run()
         
         if choice == 'PVE(VS AI)':
-            # Chạy game mode Human
-            # Lưu ý: Trong GameManager.run_human_mode KHÔNG ĐƯỢC có pygame.quit()
             game = GameManager(screen)
-            game.run_human_mode() 
-            
+            game.run_pve_mode()
+
         elif choice == 'PVP(VS PLAYER)':
-            # Tạm thời chạy chế độ human thường (sẽ update sau)
             game = GameManager(screen)
-            game.run_human_mode()
+            game.run_pvp_mode()
             
         elif choice == 'Train AI':
             break

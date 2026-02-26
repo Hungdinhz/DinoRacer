@@ -313,51 +313,150 @@ class GameManager:
                              (self.pause_btn.left + 30, self.pause_btn.top + 11, 9, 28))
 
     def _draw_paused_overlay(self):
+        # Overlay mờ
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 150))
         self.screen.blit(overlay, (0, 0))
-        txt = self.font_large.render("PAUSED", True, (255, 230, 100))
-        self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 20)))
-        hint = self.font_small.render("Press  P  to continue", True, (200, 200, 200))
-        self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)))
 
-    def _draw_game_over(self):
-        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 170))
-        self.screen.blit(overlay, (0, 0))
-
-        for p in self.particles:
-            p.draw(self.screen)
-
-        pw, ph = 460, 220
+        # Panel Pause
+        pw, ph = 400, 200
         px = SCREEN_WIDTH // 2 - pw // 2
         py = SCREEN_HEIGHT // 2 - ph // 2
 
+        # Đổ bóng
+        shadow_surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        shadow_surf.fill((0, 0, 0, 60))
+        self.screen.blit(shadow_surf, (px + 6, py + 6))
+
+        # Panel nền
         panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
-        panel.fill((15, 10, 5, 235))
+        panel.fill((20, 20, 30, 220))
         self.screen.blit(panel, (px, py))
 
+        # Viền
+        pygame.draw.rect(self.screen, (100, 150, 200), (px, py, pw, ph), 2, border_radius=12)
+        
+        # Icon tạm dừng ⏸
+        pause_icon = self.font_large.render("⏸", True, (255, 230, 100))
+        self.screen.blit(pause_icon, pause_icon.get_rect(center=(SCREEN_WIDTH // 2, py + 55)))
+
+        # Tiêu đề PAUSED
+        txt = self.font_large.render("PAUSED", True, (255, 230, 100))
+        self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH // 2, py + 100)))
+
+        # Hướng dẫn
+        hint = self.font_small.render("Nhấn  P  để tiếp tục", True, (180, 180, 200))
+        self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, py + 145)))
+        
+        # Gợi ý phím tắt
+        hint2 = self.font_small.render("ESC - Menu chính", True, (120, 120, 150))
+        self.screen.blit(hint2, hint2.get_rect(center=(SCREEN_WIDTH // 2, py + 170)))
+
+    def _draw_game_over(self):
+        # Hiệu ứng fade-in
+        fade_progress = min(1.0, self.go_flash_timer / 30)
+        overlay_alpha = int(170 * fade_progress)
+        
+        # Overlay mờ
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, overlay_alpha))
+        self.screen.blit(overlay, (0, 0))
+
+        # Vẽ particles
+        for p in self.particles:
+            p.draw(self.screen)
+
+        # Panel chính
+        pw, ph = 500, 280
+        px = SCREEN_WIDTH // 2 - pw // 2
+        py = SCREEN_HEIGHT // 2 - ph // 2 - 20
+
+        # Đổ bóng cho panel
+        shadow_offset = 8
+        shadow_surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        shadow_surf.fill((0, 0, 0, 80 * fade_progress))
+        self.screen.blit(shadow_surf, (px + shadow_offset, py + shadow_offset))
+
+        # Panel nền với viền
+        panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        panel.fill((20, 15, 10, 230))
+        
+        # Viền ngoài với hiệu ứng flash
         flash = abs(math.sin(self.go_flash_timer * 0.08))
         border_col = (
-            int(GO_BORDER[0] * flash + 100 * (1 - flash)),
-            int(GO_BORDER[1] * flash + 50  * (1 - flash)),
-            int(GO_BORDER[2] * flash),
+            int(255 * fade_progress),
+            int(200 * fade_progress),
+            int(50 * fade_progress),
         )
+        
+        # Vẽ panel chính
+        self.screen.blit(panel, (px, py))
         pygame.draw.rect(self.screen, border_col, (px, py, pw, ph), 3, border_radius=14)
+        
+        # Đường kẻ trang trí bên trong
+        pygame.draw.rect(self.screen, (60, 50, 40), (px + 8, py + 8, pw - 16, ph - 16), 1, border_radius=10)
 
-        go_txt = self.font_large.render("GAME OVER", True, GO_RED)
-        self.screen.blit(go_txt, go_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 68)))
+        # ===== TIÊU ĐỀ GAME OVER =====
+        # Shadow cho text
+        go_shadow = self.font_large.render("GAME OVER", True, (80, 20, 10))
+        self.screen.blit(go_shadow, go_shadow.get_rect(center=(SCREEN_WIDTH // 2 + 3, py + 58 + 3)))
+        
+        # Text chính với hiệu ứng thay đổi màu
+        go_color = (
+            int(220 + 35 * flash * fade_progress),
+            int(50 + 30 * flash * fade_progress),
+            int(30 + 20 * flash * fade_progress)
+        )
+        go_txt = self.font_large.render("GAME OVER", True, go_color)
+        self.screen.blit(go_txt, go_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 58)))
+
+        # ===== THÔNG TIN ĐIỂM SỐ =====
+        # Background cho phần điểm
+        score_bg_rect = pygame.Rect(px + 30, py + 95, pw - 60, 70)
+        pygame.draw.rect(self.screen, (30, 25, 20, 180), score_bg_rect, border_radius=10)
+        pygame.draw.rect(self.screen, (80, 70, 50), score_bg_rect, 1, border_radius=10)
 
         h = max(self.highscore_ai if self.is_ai_mode else self.highscore_human, self.score)
-        score_txt = self.font_med.render(f"Score: {self.score}", True, (255, 230, 80))
-        hi_txt    = self.font_med.render(f"HI: {h}", True, (200, 200, 200))
-        self.screen.blit(score_txt, score_txt.get_rect(center=(SCREEN_WIDTH // 2 - 70, py + 130)))
-        self.screen.blit(hi_txt,    hi_txt.get_rect(center=(SCREEN_WIDTH // 2 + 80, py + 130)))
+        
+        # Điểm hiện tại
+        score_label = self.font_small.render("SCORE", True, (180, 180, 180))
+        self.screen.blit(score_label, score_label.get_rect(center=(SCREEN_WIDTH // 2 - 100, py + 115)))
+        
+        score_value = self.font_large.render(f"{self.score:05d}", True, (255, 230, 80))
+        self.screen.blit(score_value, score_value.get_rect(center=(SCREEN_WIDTH // 2 - 100, py + 145)))
 
-        r_txt = self.font_small.render("R  -  Choi lai", True, GO_GREEN)
-        m_txt = self.font_small.render("ESC  -  Menu", True, (180, 180, 255))
-        self.screen.blit(r_txt, r_txt.get_rect(center=(SCREEN_WIDTH // 2 - 80, py + 185)))
-        self.screen.blit(m_txt, m_txt.get_rect(center=(SCREEN_WIDTH // 2 + 80, py + 185)))
+        # Điểm cao nhất
+        hi_label = self.font_small.render("HIGH SCORE", True, (180, 180, 180))
+        self.screen.blit(hi_label, hi_label.get_rect(center=(SCREEN_WIDTH // 2 + 100, py + 115)))
+        
+        hi_value = self.font_large.render(f"{h:05d}", True, (255, 100, 100))
+        self.screen.blit(hi_value, hi_value.get_rect(center=(SCREEN_WIDTH // 2 + 100, py + 145)))
+
+        # ===== NÚT HƯỚNG DẪN =====
+        # Nút Restart
+        r_box = pygame.Rect(px + 40, py + 185, 180, 45)
+        r_hover = r_box.inflate(4, 4)
+        pygame.draw.rect(self.screen, (60, 120, 60, 150), r_box, border_radius=8)
+        pygame.draw.rect(self.screen, (100, 200, 100), r_box, 2, border_radius=8)
+        
+        r_symbol = self.font_med.render("⟳", True, GO_GREEN)
+        r_txt = self.font_med.render("THỬ LẠI", True, GO_GREEN)
+        self.screen.blit(r_symbol, r_symbol.get_rect(center=(r_box.x + 30, r_box.centery)))
+        self.screen.blit(r_txt, r_txt.get_rect(center=(r_box.x + 100, r_box.centery)))
+        r_hint = self.font_small.render("Phím R", True, (150, 180, 150))
+        self.screen.blit(r_hint, r_hint.get_rect(center=(r_box.x + 100, r_box.bottom - 8)))
+
+        # Nút Menu
+        m_box = pygame.Rect(px + pw - 220, py + 185, 180, 45)
+        pygame.draw.rect(self.screen, (60, 60, 120, 150), m_box, border_radius=8)
+        pygame.draw.rect(self.screen, (100, 150, 200), m_box, 2, border_radius=8)
+        
+        m_symbol = self.font_med.render("☰", True, (180, 180, 255))
+        m_txt = self.font_med.render("MENU", True, (180, 180, 255))
+        self.screen.blit(m_symbol, m_symbol.get_rect(center=(m_box.x + 30, m_box.centery)))
+        self.screen.blit(m_txt, m_txt.get_rect(center=(m_box.x + 100, m_box.centery)))
+        m_hint = self.font_small.render("Phím ESC", True, (150, 150, 200))
+        self.screen.blit(m_hint, m_hint.get_rect(center=(m_box.x + 100, m_box.bottom - 8)))
 
     def draw(self):
         self._draw_background()
@@ -404,3 +503,81 @@ class GameManager:
             self.update()
             self.draw()
             self.clock.tick(FPS)
+
+    def run_pve_mode(self):
+        from src.lane_game import LaneGame, LANE_H
+        from src.ai_handler import load_genome, _get_inputs_from_lane
+        import neat
+        genome, config = load_genome()
+        net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
+        ai_lane     = LaneGame('ai_dino', 'AI',       label_color=(200, 150, 255))
+        player_lane = LaneGame('dino',    'PLAYER',   label_color=(255, 230, 80))
+        div = pygame.Surface((SCREEN_WIDTH, 4)); div.fill((255, 200, 50))
+        font_hint = pygame.font.SysFont('Arial', 16)
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_SPACE, pygame.K_UP):
+                        if not player_lane.game_over: player_lane.dino.jump()
+                    if event.key == pygame.K_DOWN:
+                        if not player_lane.game_over: player_lane.dino.duck(True)
+                    if event.key == pygame.K_r: ai_lane.reset(); player_lane.reset()
+                    if event.key == pygame.K_ESCAPE: running = False
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_DOWN: player_lane.dino.duck(False)
+            if net and not ai_lane.game_over:
+                ai_lane.update(action=net.activate(_get_inputs_from_lane(ai_lane)))
+            else:
+                ai_lane.update()
+            player_lane.update()
+            ai_lane.draw(); player_lane.draw()
+            self.screen.blit(ai_lane.surface, (0, 0))
+            self.screen.blit(div, (0, LANE_H))
+            self.screen.blit(player_lane.surface, (0, LANE_H + 4))
+            if ai_lane.game_over or player_lane.game_over:
+                hint = font_hint.render('R - Choi lai  |  ESC - Menu', True, (220,220,220))
+                self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH//2, LANE_H*2+4-12)))
+            pygame.display.flip(); self.clock.tick(FPS)
+
+    def run_pvp_mode(self):
+        from src.lane_game import LaneGame, LANE_H
+        p1 = LaneGame('dino',    'PLAYER 1', label_color=(255, 230, 80))
+        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255))
+        div = pygame.Surface((SCREEN_WIDTH, 4)); div.fill((255, 200, 50))
+        font_res  = pygame.font.SysFont('Arial', 22, bold=True)
+        font_hint = pygame.font.SysFont('Arial', 16)
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_SPACE, pygame.K_UP):
+                        if not p1.game_over: p1.dino.jump()
+                    if event.key == pygame.K_DOWN:
+                        if not p1.game_over: p1.dino.duck(True)
+                    if event.key == pygame.K_w:
+                        if not p2.game_over: p2.dino.jump()
+                    if event.key == pygame.K_s:
+                        if not p2.game_over: p2.dino.duck(True)
+                    if event.key == pygame.K_r: p1.reset(); p2.reset()
+                    if event.key == pygame.K_ESCAPE: running = False
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_DOWN: p1.dino.duck(False)
+                    if event.key == pygame.K_s: p2.dino.duck(False)
+            p1.update(); p2.update()
+            p1.draw(); p2.draw()
+            self.screen.blit(p1.surface, (0, 0))
+            self.screen.blit(div, (0, LANE_H))
+            self.screen.blit(p2.surface, (0, LANE_H + 4))
+            if p1.game_over and p2.game_over:
+                if p1.score > p2.score: msg,col = f'P1 THANG! ({p1.score}vs {p2.score})',(255,230,80)
+                elif p2.score > p1.score: msg,col = f'P2 THANG! ({p2.score} vs {p1.score})',(200,150,255)
+                else: msg,col = f'HOA! ({p1.score})',(200,200,200)
+                res = font_res.render(msg, True, col)
+                self.screen.blit(res, res.get_rect(center=(SCREEN_WIDTH//2, LANE_H+2)))
+            if p1.game_over or p2.game_over:
+                hint = font_hint.render('R - Choi lai  |  ESC - Menu', True, (220,220,220))
+                self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH//2, LANE_H*2+4-12)))
+            pygame.display.flip(); self.clock.tick(FPS)

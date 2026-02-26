@@ -48,6 +48,11 @@ def load_genome():
     return None, None
 
 
+def _get_inputs_from_lane(lane):
+    """Lấy inputs từ LaneGame object (dùng cho PVE mode)."""
+    return _get_inputs(lane.dino, lane.obstacles, lane.game_speed)
+
+
 def _get_inputs(dino, obstacles, game_speed):
     nearest = None
     min_dist = float('inf')

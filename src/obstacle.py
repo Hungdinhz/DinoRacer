@@ -101,26 +101,16 @@ class Bird(Obstacle):
 
     def draw(self, screen):
         rect = self.get_rect()
-        num = _BIRD_ANIM_FRAMES.get(self._anim, 6)
-        frames = get_sheet(
-            f"ai_dino/{self._anim}.png",
-            num,
-            self.width,
-            self.height
-        )
-        if frames:
-            idx = min(self.anim_frame, len(frames) - 1)
-            screen.blit(frames[idx], rect)
-        else:
-            # Fallback vẽ tay
-            pygame.draw.ellipse(screen, BIRD_COLOR,
-                                (self.x + 5, self.y + 8, self.width - 10, self.height - 12))
-            wing_y = self.y if self.anim_frame % 2 == 0 else self.y + self.height - 10
-            pygame.draw.ellipse(screen, (80, 80, 180), (self.x, wing_y, self.width, 12))
-            pygame.draw.circle(screen, (255, 255, 255),
-                               (self.x + self.width - 12, self.y + 12), 5)
-            pygame.draw.circle(screen, (0, 0, 0),
-                               (self.x + self.width - 11, self.y + 12), 2)
+        # Bird vẽ thủ công (fallback) vì không có sprite chim riêng
+        # Không dùng ai_dino vì sẽ bị nhầm với khủng long AI
+        pygame.draw.ellipse(screen, BIRD_COLOR,
+                            (self.x + 5, self.y + 8, self.width - 10, self.height - 12))
+        wing_y = self.y if self.anim_frame % 2 == 0 else self.y + self.height - 10
+        pygame.draw.ellipse(screen, (80, 80, 180), (self.x, wing_y, self.width, 12))
+        pygame.draw.circle(screen, (255, 255, 255),
+                           (self.x + self.width - 12, self.y + 12), 5)
+        pygame.draw.circle(screen, (0, 0, 0),
+                           (self.x + self.width - 11, self.y + 12), 2)
 
 
 def create_obstacle(x, speed):
