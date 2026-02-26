@@ -51,6 +51,7 @@ DinoRacer/
 
 | File | Nội dung |
 |------|----------|
+| [docs/HUONG_DAN_CONG_VIEC.md](docs/HUONG_DAN_CONG_VIEC.md) | **Hướng dẫn chi tiết** cho từng thành viên team |
 | [docs/TEAM_REVIEW.md](docs/TEAM_REVIEW.md) | Cấu trúc code, chi tiết module, trạng thái dự án |
 | [docs/ASSETS.md](docs/ASSETS.md) | Hướng dẫn thêm sprites và âm thanh |
 

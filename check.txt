@@ -1,0 +1,6 @@
+"""
+Class Dino - Xử lý nhảy, cúi, vẽ khủng long với animation từ sprite sheet
+Sprite sheets trong assets/images/dino/:
+  idle.png  (72x24)  = 3 frames
+  move.png  (144x24) = 6 frames
+  jump.png  (96x2

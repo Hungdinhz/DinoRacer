@@ -1,23 +1,90 @@
 """
-Assets Loader - Tải sprites và âm thanh, fallback nếu không có file
-Thêm file vào assets/images/ và assets/sounds/ để sử dụng.
-
-Cần có:
-  assets/images/dino.png, dino_duck.png, cactus.png, bird.png
-  assets/sounds/jump.wav, gameover.wav, score.wav
+Assets Loader - Tải sprites, sprite sheets và âm thanh
 """
 import os
 import pygame
 
+# Đường dẫn thư mục assets/images (dùng cho load_sprite_sheet)
+current_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "images")
+
 
 def get_assets_path():
     """Đường dẫn thư mục assets"""
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
+    return os.path.dirname(current_path)
 
 
+# --- HÀM TẢI VÀ CẮT SPRITE SHEET ---
+def load_sprite_sheet(filename, num_frames, scale=4):
+    """
+    Tải sprite sheet và cắt thành danh sách frames.
+    filename  : đường dẫn tương đối từ assets/images/ (vd: 'dino/move.png')
+    num_frames: số frame trong sheet
+    scale     : hệ số phóng to (mặc định 4x)
+    Trả về list[Surface] hoặc [] nếu không tìm thấy file.
+    """
+    image_path = os.path.join(current_path, filename)
+    try:
+        sheet = pygame.image.load(image_path).convert_alpha()
+    except (FileNotFoundError, pygame.error):
+        print(f"[assets_loader] Không tìm thấy sprite sheet: '{filename}'")
+        return []
+
+    sheet_w = sheet.get_width()
+    sheet_h = sheet.get_height()
+    frame_w = sheet_w // num_frames
+    frame_h = sheet_h
+
+    frames = []
+    for i in range(num_frames):
+        frame = pygame.Surface((frame_w, frame_h), pygame.SRCALPHA)
+        frame.blit(sheet, (0, 0), (i * frame_w, 0, frame_w, frame_h))
+        frame = pygame.transform.scale(frame, (frame_w * scale, frame_h * scale))
+        frames.append(frame)
+    return frames
+
+
+def load_sprite_sheet_sized(filename, num_frames, target_w, target_h):
+    """
+    Tải sprite sheet và scale mỗi frame về kích thước cố định (target_w x target_h).
+    Dùng khi cần fit vào hitbox cụ thể thay vì dùng scale factor.
+    """
+    image_path = os.path.join(current_path, filename)
+    try:
+        sheet = pygame.image.load(image_path).convert_alpha()
+    except (FileNotFoundError, pygame.error):
+        print(f"[assets_loader] Không tìm thấy sprite sheet: '{filename}'")
+        return []
+
+    sheet_w = sheet.get_width()
+    sheet_h = sheet.get_height()
+    frame_w = sheet_w // num_frames
+    frame_h = sheet_h
+
+    frames = []
+    for i in range(num_frames):
+        frame = pygame.Surface((frame_w, frame_h), pygame.SRCALPHA)
+        frame.blit(sheet, (0, 0), (i * frame_w, 0, frame_w, frame_h))
+        frame = pygame.transform.scale(frame, (target_w, target_h))
+        frames.append(frame)
+    return frames
+
+
+# Cache sprite sheets
+_sheet_cache = {}
+
+
+def get_sheet(filename, num_frames, target_w, target_h):
+    """Lấy frames từ sprite sheet, cache kết quả."""
+    key = (filename, num_frames, target_w, target_h)
+    if key not in _sheet_cache:
+        _sheet_cache[key] = load_sprite_sheet_sized(filename, num_frames, target_w, target_h)
+    return _sheet_cache[key]
+
+
+# --- Load ảnh đơn ---
 def load_image(path, scale=None):
-    """Tải ảnh, trả về Surface hoặc None nếu không có file"""
-    full = os.path.join(get_assets_path(), "images", path)
+    """Tải ảnh đơn, trả về Surface hoặc None nếu không có file."""
+    full = os.path.join(current_path, path)
     try:
         if os.path.exists(full):
             img = pygame.image.load(full).convert_alpha()
@@ -29,30 +96,24 @@ def load_image(path, scale=None):
     return None
 
 
-def _load_sound_file(path):
-    """Tải âm thanh từ đường dẫn đầy đủ"""
-    full = os.path.join(get_assets_path(), "sounds", path)
-    try:
-        if os.path.exists(full):
-            return pygame.mixer.Sound(full)
-    except pygame.error:
-        pass
-    return None
-
-
-# Sprites (lazy load)
 _sprites = {}
 
 
 def get_sprite(name, scale=None):
-    """Lấy sprite theo tên, cache kết quả"""
     key = (name, scale)
     if key not in _sprites:
         _sprites[key] = load_image(name + ".png", scale)
     return _sprites[key]
 
 
-# Sounds (lazy load)
+def get_sprite_from_folder(folder, filename, scale=None):
+    key = (folder, filename, scale)
+    if key not in _sprites:
+        _sprites[key] = load_image(os.path.join(folder, filename), scale)
+    return _sprites[key]
+
+
+# --- Âm thanh ---
 _sounds = {}
 _mixer_initialized = False
 
@@ -68,15 +129,17 @@ def init_mixer():
 
 
 def get_sound(name):
-    """Lấy sound theo tên, cache kết quả"""
     if name not in _sounds:
         init_mixer()
-        _sounds[name] = _load_sound_file(name + ".wav")
+        full = os.path.join(get_assets_path(), "sounds", name + ".wav")
+        try:
+            _sounds[name] = pygame.mixer.Sound(full) if os.path.exists(full) else None
+        except pygame.error:
+            _sounds[name] = None
     return _sounds[name]
 
 
 def play_sound(name):
-    """Phát âm thanh nếu có file"""
     s = get_sound(name)
     if s:
         try:
@@ -85,7 +148,6 @@ def play_sound(name):
             pass
 
 
-# Cloud positions (vẽ mây bằng pygame - không cần asset)
 CLOUD_POSITIONS = [
-    (150, 100), (400, 80), (700, 120), (950, 90), (200, 200), (600, 180),
+    (150, 60), (400, 40), (700, 80), (950, 50), (200, 150), (600, 130),
 ]

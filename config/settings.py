@@ -1,44 +1,52 @@
 """
-Cấu hình game DinoRacer - Các hằng số toàn cục
+Settings - Cấu hình toàn bộ game DinoRacer
 """
 
-# === Màn hình ===
+# Màn hình
 SCREEN_WIDTH = 1100
-SCREEN_HEIGHT = 600
+SCREEN_HEIGHT = 500
 FPS = 60
 
-# === Màu sắc ===
-BG_COLOR = (255, 255, 255)
+# Màu sắc
+BG_COLOR = (247, 247, 247)
 GROUND_COLOR = (83, 83, 83)
-DINO_COLOR = (83, 83, 83)
-CACTUS_COLOR = (0, 150, 0)
-BIRD_COLOR = (200, 0, 0)
 TEXT_COLOR = (83, 83, 83)
+DINO_COLOR = (83, 83, 83)
+CACTUS_COLOR = (0, 128, 0)
+BIRD_COLOR = (100, 100, 200)
 
-# === Vật lý ===
-GROUND_Y = 450
-GRAVITY = 0.8
-JUMP_VELOCITY = -16
-DUCK_HEIGHT_RATIO = 0.6  # Tỉ lệ chiều cao khi cúi
+# Mặt đất
+GROUND_Y = 420
 
-# === Dino ===
-DINO_WIDTH = 44
-DINO_HEIGHT = 47
+# Dino
 DINO_X = 80
+DINO_WIDTH = 60
+DINO_HEIGHT = 70
+GRAVITY = 1.2
+JUMP_VELOCITY = -18
+DUCK_HEIGHT_RATIO = 0.55
 
-# === Chướng ngại vật ===
-CACTUS_WIDTH = 34
-CACTUS_HEIGHT_SMALL = 70
-CACTUS_HEIGHT_LARGE = 100
-BIRD_WIDTH = 46
+# Chướng ngại vật - Cactus
+CACTUS_WIDTH = 40
+CACTUS_HEIGHT_SMALL = 50
+CACTUS_HEIGHT_LARGE = 80
+
+# Chướng ngại vật - Bird
+BIRD_WIDTH = 60
 BIRD_HEIGHT = 40
-OBSTACLE_SPEED_MIN = 8
-OBSTACLE_SPEED_MAX = 14
-MIN_OBSTACLE_SPAWN_DISTANCE = 600
 
-# === Game ===
+# Tốc độ chướng ngại vật
+OBSTACLE_SPEED_MIN = 6
+OBSTACLE_SPEED_MAX = 18
+
+# Khoảng cách spawn tối thiểu
+MIN_OBSTACLE_SPAWN_DISTANCE = 300
+
+# Điểm số
 INITIAL_SCORE = 0
-SPEED_INCREASE_INTERVAL = 100  # Mỗi 100 điểm tăng tốc
+SPEED_INCREASE_INTERVAL = 10
 SPEED_INCREASE_AMOUNT = 0.5
-HIGHSCORE_FILE = "highscore.json"  # Lưu trong thư mục gốc project
-BEST_GENOME_FILE = "best_genome.pkl"  # AI genome đã train
+
+# File lưu trữ
+HIGHSCORE_FILE = "highscore.json"
+BEST_GENOME_FILE = "best_genome.pkl"
