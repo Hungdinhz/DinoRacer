@@ -13,7 +13,7 @@ from src.dino import Dino
 from src.obstacle import create_obstacle
 from src.highscore import load_highscore, save_highscore
 from src.assets_loader import play_sound, CLOUD_POSITIONS
-
+from src.ui import UILayer
 
 class GameManager:
     def __init__(self, screen, is_ai_mode=False):
@@ -29,10 +29,8 @@ class GameManager:
         self.is_ai_mode = is_ai_mode
         self.highscore_human, self.highscore_ai = load_highscore()
 
-        # Them nut pause
-        self.paused = False
-        self.pause_btn = pygame.Rect(SCREEN_WIDTH - 100, 10, 50, 50)
-        self.font = pygame.font.SysFont('Arial', 30, bold=True)
+        # Khoi tao UI
+        self.ui = UILayer(screen)
 
         self.reset()  # Khởi tạo game state ban đầu
 
@@ -66,7 +64,7 @@ class GameManager:
                 return True
         return False
 
-    def update(self, action=None):
+    def update(self, action=None, speed_mult=1.0):
         """
         Cập nhật game state.
         action: None (human), hoặc (jump, duck, nothing) từ AI
@@ -86,7 +84,13 @@ class GameManager:
 
         prev_score = self.score
         for obs in self.obstacles:
+            # Lưu lại vị trí cũ trước khi update
+            old_x = obs.x
             obs.update()
+
+            # Tính toán lại quãng đường di chuyển thực tế với hệ số A/D
+            actual_speed = obs.speed * speed_mult
+            obs.x = old_x - actual_speed
             if obs.x < self.dino.x and not obs.passed:
                 obs.passed = True
                 self.score += 1
@@ -151,58 +155,19 @@ class GameManager:
         for obs in self.obstacles:
             obs.draw(self.screen)
 
-        # Điểm số & High score
-        font = pygame.font.Font(None, 36)
-        text = font.render(f"Score: {self.score}", True, TEXT_COLOR)
-        self.screen.blit(text, (SCREEN_WIDTH // 2 - 50, 10))
-        h = max(
-            self.highscore_ai if self.is_ai_mode else self.highscore_human,
-            self.score
-        )
-        text_hs = font.render(f"HI: {h}", True, TEXT_COLOR)
-        self.screen.blit(text_hs, (SCREEN_WIDTH // 2 - 50, 40))
+        # Ve UI
+        # Điểm số và High Score
+        h_score = self.highscore_ai if self.is_ai_mode else self.highscore_human
+        self.ui.draw_score(self.score, h_score)
 
-        if self.game_over:
-            font_large = pygame.font.Font(None, 72)
-            text_go = font_large.render("GAME OVER", True, (200, 0, 0))
-            rect = text_go.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-            self.screen.blit(text_go, rect)
-            text_restart = font.render("Press R to restart", True, TEXT_COLOR)
-            rect2 = text_restart.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50))
-            self.screen.blit(text_restart, rect2)
+        # Nút Pause
+        self.ui.draw_pause_icon(self.paused)
 
-        # Nút pause
-        # Kiểm tra chuột có hover vào nút không để đổi màu
-        mouse_pos = pygame.mouse.get_pos()
-        if self.pause_btn.collidepoint(mouse_pos):
-            btn_color = (150, 150, 150) # Sáng hơn khi hover
-        else:
-            btn_color = (100, 100, 100) # Màu thường
-
-        pygame.draw.rect(self.screen, btn_color, self.pause_btn, border_radius=5)
-        # Vẽ biểu tượng 2 vạch (||) hoặc tam giác (▶) tùy trạng thái
+        # Menu Pause hoặc Game Over
         if self.paused:
-            # Vẽ hình tam giác (Play)
-            pygame.draw.polygon(self.screen, (255, 255, 255), [
-                (self.pause_btn.left + 12, self.pause_btn.top + 10),
-                (self.pause_btn.left + 12, self.pause_btn.bottom - 10),
-                (self.pause_btn.right - 10, self.pause_btn.centery)
-            ])
-            
-            # Vẽ màn hình phủ mờ và chữ PAUSED lớn ở giữa
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            overlay.fill((255, 255, 255, 128)) # Màu trắng mờ
-            self.screen.blit(overlay, (0,0))
-            
-            font_large = pygame.font.Font(None, 100)
-            txt_paused = font_large.render("PAUSED", True, (83, 83, 83))
-            rect_paused = txt_paused.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2))
-            self.screen.blit(txt_paused, rect_paused)
-            
-        else:
-            # Vẽ 2 vạch dọc (Pause)
-            pygame.draw.rect(self.screen, (255, 255, 255), (self.pause_btn.left + 10, self.pause_btn.top + 10, 10, 30))
-            pygame.draw.rect(self.screen, (255, 255, 255), (self.pause_btn.left + 30, self.pause_btn.top + 10, 10, 30))
+            self.ui.draw_pause_menu()
+        if self.game_over:
+            self.ui.draw_game_over()
 
         pygame.display.flip()
 
@@ -211,29 +176,49 @@ class GameManager:
         pygame.init()
         running = True
         while running:
+            # --- KIỂM TRA PHÍM GIỮ CHO A VÀ D ---
+            keys = pygame.key.get_pressed()
+            speed_mult = 1.0  # Tốc độ bình thường
+            
+            if not self.paused and not self.game_over:
+                if keys[pygame.K_a]:
+                    speed_mult = 0.5  # Bấm A: Trôi chậm lại 50%
+                elif keys[pygame.K_d]:
+                    speed_mult = 1.5  # Bấm D: Trôi nhanh lên 180%
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
+                    # using W A S D de dieu khien dino
+                    if event.key == pygame.K_w and not self.paused:
                         self.dino.jump()
-                    if event.key == pygame.K_DOWN:
+                    if event.key == pygame.K_s and not self.paused:
                         self.dino.duck(True)
+                    # if event.key == pygame.K_d and not self.paused:
+                    #     self.toggle_pause()
+                    # if event.key == pygame.K_a and not self.paused:
+                    #     self.toggle_pause()
                     if event.key == pygame.K_p:
                         self.toggle_pause()
                 if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_DOWN:
+                    if event.key == pygame.K_DOWN or event.key == pygame.K_s:
                         self.dino.duck(False)
                 if event.type == pygame.KEYDOWN and self.game_over and event.key == pygame.K_r:
                     self.reset()
                 # Xử lý Click chuột
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1: # Chuột trái
-                        # Nếu click vào nút Pause
-                        if self.pause_btn.collidepoint(event.pos):
-                            self.toggle_pause()
+                        if self.paused:
+                        # Hỏi UI xem user bấm vào nút nào
+                            action = self.ui.handle_pause_menu_click(event.pos)
+                            if action == "Resume": self.toggle_pause()
+                            elif action == "Restart": self.reset()
+                            elif action == "Quit": return 
+                        else:
+                            if self.ui.is_pause_button_clicked(event.pos):
+                                self.toggle_pause()
 
-            self.update()
+            self.update(speed_mult=speed_mult)
             self.draw()
             self.clock.tick(FPS)
 
