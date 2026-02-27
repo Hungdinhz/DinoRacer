@@ -5,7 +5,7 @@ import neat
 from dotenv import load_dotenv
 from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
 from src.game_manager import GameManager
-from src.menu import Menu
+from src.menu import Menu, settings
 from src.ai_handler import (
     run_neat_training,
     run_best_genome_display,
@@ -52,9 +52,17 @@ def main():
             game = GameManager(screen)
             game.run_pvp_mode()
             
+        elif choice == 'Time Attack':
+            from src.time_attack import run_time_attack
+            difficulty = settings.difficulty
+            run_time_attack(screen, difficulty=difficulty)
+            
+        elif choice == 'Endless':
+            from src.endless import run_endless
+            run_endless(screen)
+            
         elif choice == 'Train AI':
             print("Bắt đầu training NEAT... (Nhấn Ctrl+C để dừng sớm)")
-            # Train AI không cần màn hình đồ họa nặng, nhưng vẫn cần pygame init
             winner = run_neat_training(generations=20)
             if winner:
                 print("\nTraining xong! Chạy AI tốt nhất...")
