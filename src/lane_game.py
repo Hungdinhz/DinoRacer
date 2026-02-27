@@ -113,7 +113,8 @@ class LaneGame:
         # Điều chỉnh y cho lane (GROUND_Y_LANE thay vì GROUND_Y gốc)
         from config.settings import DINO_HEIGHT
         self.dino.y = GROUND_Y_LANE - DINO_HEIGHT
-        self.dino._ground_y = GROUND_Y_LANE   # override để physics đúng
+        # Lưu ground_y riêng cho lane để physics sử dụng
+        self.dino.ground_y = GROUND_Y_LANE
 
         self.obstacles = []
         self.score = INITIAL_SCORE
@@ -127,13 +128,14 @@ class LaneGame:
 
     # ── Physics override ──────────────────────────────────────
     def _update_dino_physics(self):
-        """Cập nhật dino với GROUND_Y_LANE thay vì GROUND_Y gốc."""
+        """Cập nhật dino với ground_y của lane thay vì GROUND_Y gốc."""
         from config.settings import GRAVITY, DINO_HEIGHT
         d = self.dino
+        # Sử dụng ground_y đã được thiết lập trong reset()
+        ground = getattr(d, 'ground_y', GROUND_Y_LANE) - DINO_HEIGHT
         if d.is_jumping:
             d.vel_y += GRAVITY
             d.y += d.vel_y
-            ground = GROUND_Y_LANE - DINO_HEIGHT
             if d.y >= ground:
                 d.y = ground
                 d.vel_y = 0
@@ -308,7 +310,7 @@ class LaneGame:
         if self.game_over and show_go:
             # Hiệu ứng fade-in
             fade_progress = min(1.0, self.go_flash_timer / 20)
-            
+
             # Overlay mờ với fade
             ov = pygame.Surface((LANE_W, LANE_H), pygame.SRCALPHA)
             ov.fill((0, 0, 0, int(160 * fade_progress)))
@@ -336,7 +338,7 @@ class LaneGame:
             # Tiêu đề GAME OVER với shadow
             go_shadow = self.font_go.render("GAME OVER", True, (80, 20, 10))
             surf.blit(go_shadow, go_shadow.get_rect(center=(LANE_W // 2 + 2, py + 42)))
-            
+
             go = self.font_go.render("GAME OVER", True, (220, 50, 30))
             surf.blit(go, go.get_rect(center=(LANE_W // 2, py + 40)))
 

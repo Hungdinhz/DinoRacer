@@ -335,7 +335,7 @@ class GameManager:
 
         # Viền
         pygame.draw.rect(self.screen, (100, 150, 200), (px, py, pw, ph), 2, border_radius=12)
-        
+
         # Icon tạm dừng ⏸
         pause_icon = self.font_large.render("⏸", True, (255, 230, 100))
         self.screen.blit(pause_icon, pause_icon.get_rect(center=(SCREEN_WIDTH // 2, py + 55)))
@@ -347,7 +347,7 @@ class GameManager:
         # Hướng dẫn
         hint = self.font_small.render("Nhấn  P  để tiếp tục", True, (180, 180, 200))
         self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, py + 145)))
-        
+
         # Gợi ý phím tắt
         hint2 = self.font_small.render("ESC - Menu chính", True, (120, 120, 150))
         self.screen.blit(hint2, hint2.get_rect(center=(SCREEN_WIDTH // 2, py + 170)))
@@ -356,7 +356,7 @@ class GameManager:
         # Hiệu ứng fade-in
         fade_progress = min(1.0, self.go_flash_timer / 30)
         overlay_alpha = int(170 * fade_progress)
-        
+
         # Overlay mờ
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, overlay_alpha))
@@ -380,7 +380,7 @@ class GameManager:
         # Panel nền với viền
         panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
         panel.fill((20, 15, 10, 230))
-        
+
         # Viền ngoài với hiệu ứng flash
         flash = abs(math.sin(self.go_flash_timer * 0.08))
         border_col = (
@@ -388,11 +388,11 @@ class GameManager:
             int(200 * fade_progress),
             int(50 * fade_progress),
         )
-        
+
         # Vẽ panel chính
         self.screen.blit(panel, (px, py))
         pygame.draw.rect(self.screen, border_col, (px, py, pw, ph), 3, border_radius=14)
-        
+
         # Đường kẻ trang trí bên trong
         pygame.draw.rect(self.screen, (60, 50, 40), (px + 8, py + 8, pw - 16, ph - 16), 1, border_radius=10)
 
@@ -400,7 +400,7 @@ class GameManager:
         # Shadow cho text
         go_shadow = self.font_large.render("GAME OVER", True, (80, 20, 10))
         self.screen.blit(go_shadow, go_shadow.get_rect(center=(SCREEN_WIDTH // 2 + 3, py + 58 + 3)))
-        
+
         # Text chính với hiệu ứng thay đổi màu
         go_color = (
             int(220 + 35 * flash * fade_progress),
@@ -417,18 +417,18 @@ class GameManager:
         pygame.draw.rect(self.screen, (80, 70, 50), score_bg_rect, 1, border_radius=10)
 
         h = max(self.highscore_ai if self.is_ai_mode else self.highscore_human, self.score)
-        
+
         # Điểm hiện tại
         score_label = self.font_small.render("SCORE", True, (180, 180, 180))
         self.screen.blit(score_label, score_label.get_rect(center=(SCREEN_WIDTH // 2 - 100, py + 115)))
-        
+
         score_value = self.font_large.render(f"{self.score:05d}", True, (255, 230, 80))
         self.screen.blit(score_value, score_value.get_rect(center=(SCREEN_WIDTH // 2 - 100, py + 145)))
 
         # Điểm cao nhất
         hi_label = self.font_small.render("HIGH SCORE", True, (180, 180, 180))
         self.screen.blit(hi_label, hi_label.get_rect(center=(SCREEN_WIDTH // 2 + 100, py + 115)))
-        
+
         hi_value = self.font_large.render(f"{h:05d}", True, (255, 100, 100))
         self.screen.blit(hi_value, hi_value.get_rect(center=(SCREEN_WIDTH // 2 + 100, py + 145)))
 
@@ -438,7 +438,7 @@ class GameManager:
         r_hover = r_box.inflate(4, 4)
         pygame.draw.rect(self.screen, (60, 120, 60, 150), r_box, border_radius=8)
         pygame.draw.rect(self.screen, (100, 200, 100), r_box, 2, border_radius=8)
-        
+
         r_symbol = self.font_med.render("⟳", True, GO_GREEN)
         r_txt = self.font_med.render("THỬ LẠI", True, GO_GREEN)
         self.screen.blit(r_symbol, r_symbol.get_rect(center=(r_box.x + 30, r_box.centery)))
@@ -450,7 +450,7 @@ class GameManager:
         m_box = pygame.Rect(px + pw - 220, py + 185, 180, 45)
         pygame.draw.rect(self.screen, (60, 60, 120, 150), m_box, border_radius=8)
         pygame.draw.rect(self.screen, (100, 150, 200), m_box, 2, border_radius=8)
-        
+
         m_symbol = self.font_med.render("☰", True, (180, 180, 255))
         m_txt = self.font_med.render("MENU", True, (180, 180, 255))
         self.screen.blit(m_symbol, m_symbol.get_rect(center=(m_box.x + 30, m_box.centery)))

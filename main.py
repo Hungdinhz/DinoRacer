@@ -36,7 +36,6 @@ def main():
             game.run_pvp_mode()
             
         elif choice == 'Train AI':
-            break
             print("Bắt đầu training NEAT... (Nhấn Ctrl+C để dừng sớm)")
             # Train AI không cần màn hình đồ họa nặng, nhưng vẫn cần pygame init
             winner = run_neat_training(generations=20)

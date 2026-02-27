@@ -1,3 +1,6 @@
+"""
+Menu - Menu chính của game với các lựa chọn: PVE, PVP, Train AI, Quit
+"""
 import pygame
 import random
 from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
