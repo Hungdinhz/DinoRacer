@@ -1,6 +1,8 @@
 import sys
+import os
 import pygame
 import neat
+from dotenv import load_dotenv
 from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
 from src.game_manager import GameManager
 from src.menu import Menu
@@ -11,6 +13,21 @@ from src.ai_handler import (
     load_genome,
 )
 from src.assets_loader import clear_sheet_cache
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Initialize database on startup
+try:
+    from src.database_handler import init_database, test_connection
+    success, result = test_connection()
+    if success:
+        print(f"Database connected: {result}")
+        init_database()
+    else:
+        print(f"Database connection failed: {result}")
+except Exception as e:
+    print(f"Database initialization skipped: {e}")
 
 def main():
     # 1. Khởi tạo Pygame MỘT LẦN DUY NHẤT ở đầu chương trình

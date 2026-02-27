@@ -13,6 +13,7 @@ from config.settings import (
 from src.dino import Dino
 from src.obstacle import create_obstacle
 from src.assets_loader import play_sound, load_image
+from src.data_collector import get_collector
 
 # Chiều cao mỗi lane = nửa màn hình
 LANE_H = 250
@@ -82,15 +83,18 @@ class LaneGame:
     dino_folder: "dino" (vàng - player) hoặc "ai_dino" (tím - AI)
     label      : tên hiển thị góc trên lane ("PLAYER", "AI", "P1", "P2")
     label_color: màu chữ label
+    collect_data: True nếu muốn thu thập dữ liệu training
+    player_type: "human" hoặc "ai" - nguồn dữ liệu
     """
 
     def __init__(self, dino_folder="dino", label="PLAYER",
-                 label_color=(255, 230, 80)):
+                 label_color=(255, 230, 80), collect_data=False, player_type="human"):
         self.dino_folder = dino_folder
         self.label = label
         self.label_color = label_color
+        self.collect_data = collect_data
+        self.player_type = player_type
 
-        # Surface riêng cho lane này
         self.surface = pygame.Surface((LANE_W, LANE_H))
 
         self.font_hud   = pygame.font.SysFont("Arial", 20, bold=True)
@@ -107,13 +111,10 @@ class LaneGame:
 
         self.reset()
 
-    # ── Reset ─────────────────────────────────────────────────
     def reset(self):
         self.dino = Dino(x=80, folder=self.dino_folder)
-        # Điều chỉnh y cho lane (GROUND_Y_LANE thay vì GROUND_Y gốc)
         from config.settings import DINO_HEIGHT
         self.dino.y = GROUND_Y_LANE - DINO_HEIGHT
-        # Lưu ground_y riêng cho lane để physics sử dụng
         self.dino.ground_y = GROUND_Y_LANE
 
         self.obstacles = []
@@ -124,14 +125,14 @@ class LaneGame:
         self.ground_offset = 0
         self.bg_offset = 0
         self.bg_index = 1
-        self.go_flash_timer = 0  # Timer cho hiệu ứng fade-in
+        self.go_flash_timer = 0
+        
+        self.last_action = (0, 0)
+        self.frame_count = 0
 
-    # ── Physics override ──────────────────────────────────────
     def _update_dino_physics(self):
-        """Cập nhật dino với ground_y của lane thay vì GROUND_Y gốc."""
         from config.settings import GRAVITY, DINO_HEIGHT
         d = self.dino
-        # Sử dụng ground_y đã được thiết lập trong reset()
         ground = getattr(d, 'ground_y', GROUND_Y_LANE) - DINO_HEIGHT
         if d.is_jumping:
             d.vel_y += GRAVITY
@@ -140,7 +141,6 @@ class LaneGame:
                 d.y = ground
                 d.vel_y = 0
                 d.is_jumping = False
-        # Cập nhật animation (gọi trực tiếp phần animation của dino)
         anim = d._anim_name()
         from src.dino import _ANIM_FRAMES, _ANIM_SPEED
         if anim != d._cur_anim:
@@ -153,24 +153,20 @@ class LaneGame:
                 d.anim_timer = 0
                 d.anim_frame = (d.anim_frame + 1) % _ANIM_FRAMES.get(anim, 1)
 
-    # ── Spawn obstacle ────────────────────────────────────────
     def _spawn_obstacle(self):
         if self.last_obstacle_x - LANE_W < -MIN_OBSTACLE_SPAWN_DISTANCE:
             speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
             obs = create_obstacle(LANE_W + 50, speed)
-            # Điều chỉnh y của obstacle cho lane
             from src.obstacle import Cactus, Bird
             if isinstance(obs, Cactus):
                 obs.y = GROUND_Y_LANE - obs.height
             else:
-                # Bird: scale độ cao xuống tỉ lệ với lane
                 from config.settings import GROUND_Y
                 ratio = GROUND_Y_LANE / GROUND_Y
                 obs.y = int(obs.y * ratio)
             self.obstacles.append(obs)
             self.last_obstacle_x = obs.x
 
-    # ── Collision ─────────────────────────────────────────────
     def check_collision(self):
         from config.settings import DINO_HEIGHT
         d = self.dino
@@ -194,21 +190,77 @@ class LaneGame:
             h = int(d.height * DUCK_HEIGHT_RATIO)
         return pygame.Rect(d.x, d.y + (d.height - h), d.width, h)
 
-    # ── Update ────────────────────────────────────────────────
-    def update(self, action=None):
-        """
-        action: None = human điều khiển bên ngoài,
-                tuple (jump, duck, _) = AI điều khiển
-        """
+    def _collect_data(self, action):
+        if not self.collect_data:
+            return
+        
+        if action == self.last_action and self.frame_count % 10 != 0:
+            return
+        
+        collector = get_collector()
+        
+        # Sử dụng record_sample để lưu dữ liệu đúng format
+        collector.record_sample(
+            dino=self.dino,
+            obstacles=self.obstacles,
+            game_speed=self.game_speed,
+            action=action,
+            source=self.player_type,
+            ground_y=GROUND_Y_LANE,
+            score=self.score
+        )
+        
+        self.last_action = action
+    
+    def _get_inputs_for_collector(self):
+        nearest = None
+        min_dist = float("inf")
+        for obs in self.obstacles:
+            if obs.x > self.dino.x:
+                dist = obs.x - self.dino.x
+                if dist < min_dist:
+                    min_dist = dist
+                    nearest = obs
+        
+        if nearest is None:
+            return [1.0, 0.5, 0.0, 0.0, 0.0, 0.0]
+        
+        from src.obstacle import Cactus
+        
+        dist_normalized = min(min_dist / 500, 1.0)
+        obs_type = 0.0 if isinstance(nearest, Cactus) else 1.0
+        speed_normalized = (self.game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
+        height_normalized = min((GROUND_Y_LANE - self.dino.y) / 100, 1.0)
+        is_jumping = 1.0 if self.dino.is_jumping else 0.0
+        is_ducking = 1.0 if self.dino.is_ducking else 0.0
+        
+        return [dist_normalized, obs_type, speed_normalized, height_normalized, is_jumping, is_ducking]
+
+    def update(self, action=None, player_action=None):
         if self.game_over:
             self.go_flash_timer += 1
+            if self.collect_data and len(get_collector().current_session_data) > 0:
+                get_collector().save_session_data()
             return
 
+        actual_action = (0, 0)
+        
         if action is not None:
             jump, duck, _ = action
             if jump > 0.5:
                 self.dino.jump()
+                actual_action = (1, 0)
             self.dino.set_duck(duck > 0.5)
+            if duck > 0.5 and not self.dino.is_jumping:
+                actual_action = (actual_action[0], 1)
+        elif player_action is not None:
+            jump, duck = player_action
+            if jump > 0.5 and not self.dino.is_jumping:
+                self.dino.jump()
+                actual_action = (1, 0)
+            self.dino.duck(duck > 0.5)
+            if duck > 0.5 and not self.dino.is_jumping:
+                actual_action = (actual_action[0], 1)
 
         self._update_dino_physics()
         self._spawn_obstacle()
@@ -239,8 +291,12 @@ class LaneGame:
         if self.check_collision():
             self.game_over = True
             play_sound("gameover")
+            if self.collect_data:
+                get_collector().save_session_data()
+        
+        self.frame_count += 1
+        self._collect_data(actual_action)
 
-    # ── get_state cho AI ──────────────────────────────────────
     def get_state(self):
         nearest = None
         min_dist = float("inf")
@@ -261,23 +317,18 @@ class LaneGame:
             1.0 if self.dino.is_jumping else 0.0,
         ]
 
-    # ── Draw ──────────────────────────────────────────────────
     def draw(self, show_go=True):
-        """Vẽ toàn bộ lane vào self.surface."""
         surf = self.surface
 
-        # Background parallax
         bg = _get_bg(self.bg_index)
         ox = int(self.bg_offset) % LANE_W
         surf.blit(bg, (-ox, 0))
         if ox > 0:
             surf.blit(bg, (LANE_W - ox, 0))
 
-        # Mây
         for c in self.clouds:
             c.draw(surf)
 
-        # Mặt đất
         tile_h = LANE_H - GROUND_Y_LANE
         tile_w = 64
         tile = _get_tile((tile_w, tile_h))
@@ -289,14 +340,11 @@ class LaneGame:
             pygame.draw.rect(surf, GROUND_COL, (0, GROUND_Y_LANE, LANE_W, tile_h))
             pygame.draw.line(surf, GROUND_LN, (0, GROUND_Y_LANE), (LANE_W, GROUND_Y_LANE), 2)
 
-        # Dino
         self.dino.draw(surf)
 
-        # Obstacles
         for obs in self.obstacles:
             obs.draw(surf)
 
-        # HUD: label + score
         lbl = self.font_label.render(self.label, True, self.label_color)
         surf.blit(lbl, (8, 6))
 
@@ -306,27 +354,25 @@ class LaneGame:
         spd_txt = self.font_small.render(f"SPD {self.game_speed:.1f}", True, (180, 255, 180))
         surf.blit(spd_txt, (LANE_W - spd_txt.get_width() - 8, 6))
 
-        # Game over overlay
+        if self.collect_data:
+            data_icon = self.font_small.render("●", True, (0, 255, 0))
+            surf.blit(data_icon, (LANE_W - 25, 28))
+
         if self.game_over and show_go:
-            # Hiệu ứng fade-in
             fade_progress = min(1.0, self.go_flash_timer / 20)
 
-            # Overlay mờ với fade
             ov = pygame.Surface((LANE_W, LANE_H), pygame.SRCALPHA)
             ov.fill((0, 0, 0, int(160 * fade_progress)))
             surf.blit(ov, (0, 0))
 
-            # Panel nhỏ cho Game Over
             pw, ph = 300, 140
             px = LANE_W // 2 - pw // 2
             py = LANE_H // 2 - ph // 2
 
-            # Panel nền với fade
             panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
             panel.fill((15, 10, 5, int(220 * fade_progress)))
             surf.blit(panel, (px, py))
 
-            # Viền với hiệu ứng flash
             flash = abs(math.sin(self.go_flash_timer * 0.1))
             border_col = (
                 int(255 * fade_progress),
@@ -335,17 +381,14 @@ class LaneGame:
             )
             pygame.draw.rect(surf, border_col, (px, py, pw, ph), 2, border_radius=10)
 
-            # Tiêu đề GAME OVER với shadow
             go_shadow = self.font_go.render("GAME OVER", True, (80, 20, 10))
             surf.blit(go_shadow, go_shadow.get_rect(center=(LANE_W // 2 + 2, py + 42)))
 
             go = self.font_go.render("GAME OVER", True, (220, 50, 30))
             surf.blit(go, go.get_rect(center=(LANE_W // 2, py + 40)))
 
-            # Điểm số
-            score_txt = self.font_label.render(f"Điểm: {self.score:05d}", True, (255, 230, 80))
+            score_txt = self.font_label.render(f"Diem: {self.score:05d}", True, (255, 230, 80))
             surf.blit(score_txt, score_txt.get_rect(center=(LANE_W // 2, py + 80)))
 
-            # Hướng dẫn
-            hint = self.font_small.render("R - Thử lại  |  ESC - Menu", True, (200, 200, 200))
+            hint = self.font_small.render("R - Thu lai  |  ESC - Menu", True, (200, 200, 200))
             surf.blit(hint, hint.get_rect(center=(LANE_W // 2, py + 115)))

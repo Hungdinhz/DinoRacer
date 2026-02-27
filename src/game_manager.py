@@ -626,8 +626,8 @@ class GameManager:
 
     def run_pvp_mode(self):
         from src.lane_game import LaneGame, LANE_H
-        p1 = LaneGame('dino',    'PLAYER 1', label_color=(255, 230, 80))
-        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255))
+        p1 = LaneGame('dino',    'PLAYER 1', label_color=(255, 230, 80), collect_data=True, player_type="human")
+        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255), collect_data=True, player_type="ai")
         div = pygame.Surface((SCREEN_WIDTH, 4)); div.fill((255, 200, 50))
         font_res  = pygame.font.SysFont('Arial', 22, bold=True)
         font_hint = pygame.font.SysFont('Arial', 16)
