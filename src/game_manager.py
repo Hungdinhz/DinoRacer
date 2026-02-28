@@ -676,12 +676,14 @@ class GameManager:
                 if event.type == pygame.QUIT: running = False
                 if event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
-                        if not player_lane.game_over: player_lane.dino.jump()
+                        if not player_lane.game_over: player_lane.dino.jump_press()
                     if event.key == pygame.K_DOWN:
                         if not player_lane.game_over: player_lane.dino.duck(True)
                     if event.key == pygame.K_r: ai_lane.reset(); player_lane.reset()
                     if event.key == pygame.K_ESCAPE: running = False
                 if event.type == pygame.KEYUP:
+                    if event.key in (pygame.K_SPACE, pygame.K_UP):
+                        player_lane.dino.jump_release()
                     if event.key == pygame.K_DOWN: player_lane.dino.duck(False)
             if net and not ai_lane.game_over:
                 ai_lane.update(action=net.activate(_get_inputs_from_lane(ai_lane)))
@@ -693,7 +695,7 @@ class GameManager:
             self.screen.blit(div, (0, LANE_H))
             self.screen.blit(player_lane.surface, (0, LANE_H + 4))
             if ai_lane.game_over or player_lane.game_over:
-                hint = font_hint.render('R - Chơi lại  |  ESC - Menu', True, (220, 220, 220))
+                hint = font_hint.render('R - Choi lai  |  ESC - Menu', True, (220, 220, 220))
                 self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, LANE_H * 2 + 4 - 12)))
             pygame.display.flip(); self.clock.tick(FPS)
 
@@ -710,16 +712,20 @@ class GameManager:
                 if event.type == pygame.QUIT: running = False
                 if event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
-                        if not p1.game_over: p1.dino.jump()
+                        if not p1.game_over: p1.dino.jump_press()
                     if event.key == pygame.K_DOWN:
                         if not p1.game_over: p1.dino.duck(True)
                     if event.key == pygame.K_w:
-                        if not p2.game_over: p2.dino.jump()
+                        if not p2.game_over: p2.dino.jump_press()
                     if event.key == pygame.K_s:
                         if not p2.game_over: p2.dino.duck(True)
                     if event.key == pygame.K_r: p1.reset(); p2.reset()
                     if event.key == pygame.K_ESCAPE: running = False
                 if event.type == pygame.KEYUP:
+                    if event.key in (pygame.K_SPACE, pygame.K_UP):
+                        p1.dino.jump_release()
+                    if event.key in (pygame.K_w):
+                        p2.dino.jump_release()
                     if event.key == pygame.K_DOWN: p1.dino.duck(False)
                     if event.key == pygame.K_s: p2.dino.duck(False)
             p1.update(); p2.update()

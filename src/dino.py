@@ -218,18 +218,16 @@ class Dino:
             self.height
         )
 
-        # Vẽ motion trail trước (chỉ khi đang nhảy và có sprite)
-        if self.is_jumping and len(self._trail_positions) > 0 and frames:
-            for i, (tx, ty) in enumerate(self._trail_positions):
-                # Tính alpha giảm dần
-                alpha = int(40 * (i + 1) / len(self._trail_positions))
-                idx = min(self.anim_frame, len(frames) - 1)
-                frame_copy = frames[idx].copy()
-                # Áp dụng alpha bằng convert + blit với per-pixel alpha
-                temp_surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-                temp_surf.blit(frame_copy, (0, 0))
-                temp_surf.set_alpha(alpha)
-                screen.blit(temp_surf, (tx, rect.y))
+        # Motion trail tạm tắt để tránh lag
+        # if self.is_jumping and len(self._trail_positions) > 0 and frames:
+        #     for i, (tx, ty) in enumerate(self._trail_positions):
+        #         alpha = int(40 * (i + 1) / len(self._trail_positions))
+        #         idx = min(self.anim_frame, len(frames) - 1)
+        #         frame_copy = frames[idx].copy()
+        #         temp_surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        #         temp_surf.blit(frame_copy, (0, 0))
+        #         temp_surf.set_alpha(alpha)
+        #         screen.blit(temp_surf, (tx, rect.y))
 
         if frames:
             idx = min(self.anim_frame, len(frames) - 1)

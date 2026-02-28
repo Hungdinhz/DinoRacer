@@ -28,10 +28,10 @@ def _get_lane_font(name, size, bold=False):
     return _lane_font_cache[key]
 
 
-# Chiều cao mỗi lane = nửa màn hình
-LANE_H = 250
+# Chiều cao mỗi lane = nửa màn hình (điều chỉnh theo màn hình)
+LANE_H = 360  # Nửa màn hình 720
 LANE_W = SCREEN_WIDTH
-GROUND_Y_LANE = LANE_H - 55   # mặt đất trong lane
+GROUND_Y_LANE = LANE_H - 60   # mặt đất trong lane
 
 SKY_TOP    = (100, 180, 230)
 SKY_BOT    = (255, 210, 120)
@@ -155,14 +155,29 @@ class LaneGame:
         d = self.dino
         # Sử dụng d.height thay vì DINO_HEIGHT cố định
         ground = d.ground_y - d.height
+
+        # Sử dụng các biến physics từ settings
+        from src.dino import GRAVITY, JUMP_HOLD_GRAVITY, JUMP_MIN_VELOCITY
+
         if d.is_jumping:
-            d.vel_y += game_settings.GRAVITY
+            # Sử dụng gravity nhẹ hơn khi giữ phím
+            current_gravity = GRAVITY
+            d.vel_y += current_gravity
             d.y += d.vel_y
-            # Sửa: dùng > thay vì >= để tránh landing ngay lập tức
-            if d.y > ground:
+            # Sửa: dùng >= thay vì > để đảm bảo landing đúng
+            if d.y >= ground:
                 d.y = ground
                 d.vel_y = 0
                 d.is_jumping = False
+                d.is_on_ground = True
+                d._coyote_timer = 8  # Reset coyote time
+        else:
+            # Trên ground - đảm bảo y đúng vị trí
+            d.is_on_ground = True
+            if d.y < ground:
+                d.y = ground
+
+        # Update animation
         anim = d._anim_name()
         from src.dino import _ANIM_FRAMES, _ANIM_SPEED
         if anim != d._cur_anim:
@@ -267,7 +282,8 @@ class LaneGame:
             return
 
         actual_action = (0, 0)
-        
+
+        # Handle AI action
         if action is not None:
             jump, duck, _ = action
             if jump > 0.5:
@@ -276,16 +292,18 @@ class LaneGame:
             self.dino.set_duck(duck > 0.5)
             if duck > 0.5 and not self.dino.is_jumping:
                 actual_action = (actual_action[0], 1)
+        # Handle player action (from keyboard)
         elif player_action is not None:
             jump, duck = player_action
-            if jump > 0.5 and not self.dino.is_jumping:
-                self.dino.jump()
+            if jump > 0.5:
+                self.dino.jump_press()
                 actual_action = (1, 0)
             self.dino.duck(duck > 0.5)
             if duck > 0.5 and not self.dino.is_jumping:
                 actual_action = (actual_action[0], 1)
 
-        self._update_dino_physics()
+        # Update dino physics using proper update method
+        self.dino.update(jump_held=False)
         self._spawn_obstacle()
 
         self.ground_offset = (self.ground_offset + self.game_speed) % 64
