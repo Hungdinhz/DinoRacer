@@ -119,7 +119,7 @@ class EndlessGame:
             if keys[pygame.K_DOWN]:
                 self.dino.duck(True)
         
-        self.dino.update()
+        self.dino.update(jump_held=False)
         self.spawn_obstacle()
         
         # Update obstacles

@@ -198,6 +198,11 @@ class GameManager:
         # Cache dino rect để tránh tạo mới mỗi frame
         self._dino_rect_cache = None
 
+        # Input smoothing
+        self._jump_pressed = False
+        self._jump_released = True
+        self._last_jump_state = False
+
         self.reset()
 
     def reset(self):
@@ -254,11 +259,12 @@ class GameManager:
                 return True
         return False
 
-    def update(self, action=None, speed_mult=1.0):
+    def update(self, action=None, speed_mult=1.0, jump_held=False):
         """
         Cập nhật game state.
         action    : None (human), hoặc (jump, duck, nothing) từ AI
         speed_mult: hệ số tốc độ obstacle (A=0.5, bình thường=1.0, D=1.5)
+        jump_held : True nếu phím nhảy đang được giữ (variable jump height)
         """
         if self.paused:
             return
@@ -276,7 +282,7 @@ class GameManager:
                 self.dino.jump()
             self.dino.duck(duck > 0.5)
 
-        self.dino.update()
+        self.dino.update(jump_held=jump_held)
         self.spawn_obstacle()
 
         self.ground_offset = (self.ground_offset + self.game_speed * speed_mult) % 64
@@ -610,11 +616,15 @@ class GameManager:
             # --- Đọc phím giữ để tính speed_mult ---
             keys = pygame.key.get_pressed()
             speed_mult = 1.0
+            jump_held = False
             if not self.paused and not self.game_over:
                 if keys[pygame.K_a]:
                     speed_mult = 0.5   # A: chậm 50%
                 elif keys[pygame.K_d]:
                     speed_mult = 1.5   # D: nhanh 150%
+
+                # Track trạng thái jump key
+                jump_held = keys[pygame.K_SPACE] or keys[pygame.K_UP]
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -623,7 +633,7 @@ class GameManager:
                 if event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
                         if not self.game_over and not self.paused:
-                            self.dino.jump()
+                            self.dino.jump_press()
                     if event.key == pygame.K_DOWN:
                         if not self.game_over and not self.paused:
                             self.dino.duck(True)
@@ -636,6 +646,8 @@ class GameManager:
                         running = False
 
                 if event.type == pygame.KEYUP:
+                    if event.key in (pygame.K_SPACE, pygame.K_UP):
+                        self.dino.jump_release()
                     if event.key in (pygame.K_DOWN, pygame.K_s):
                         self.dino.duck(False)
 
@@ -643,7 +655,8 @@ class GameManager:
                     if self.pause_btn.collidepoint(event.pos) and not self.game_over:
                         self.toggle_pause()
 
-            self.update(speed_mult=speed_mult)
+            # Update với jump_held để hỗ trợ variable jump height
+            self.update(speed_mult=speed_mult, jump_held=jump_held)
             self.draw()
             self.clock.tick(FPS)
 

@@ -25,21 +25,32 @@ _bg_gradient_surface = None
 def _get_menu_background():
     """Cache gradient background cho menu."""
     global _bg_gradient_surface
-    if _bg_gradient_surface is None:
-        _bg_gradient_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    # Luôn tạo background với kích thước hiện tại của màn hình
+    current_w = pygame.display.get_surface().get_width() if pygame.display.get_surface() else SCREEN_WIDTH
+    current_h = pygame.display.get_surface().get_height() if pygame.display.get_surface() else SCREEN_HEIGHT
+    
+    # Nếu kích thước thay đổi, tạo lại background
+    if _bg_gradient_surface is None or _bg_gradient_surface.get_size() != (current_w, current_h):
+        _bg_gradient_surface = pygame.Surface((current_w, current_h))
 
         # Draw gradient
         SKY_COLOR_TOP = (60, 30, 70)
         SKY_COLOR_BOTTOM = (200, 100, 50)
 
-        for y in range(SCREEN_HEIGHT):
-            t = y / SCREEN_HEIGHT
+        for y in range(current_h):
+            t = y / current_h
             r = int(SKY_COLOR_TOP[0] + (SKY_COLOR_BOTTOM[0] - SKY_COLOR_TOP[0]) * t)
             g = int(SKY_COLOR_TOP[1] + (SKY_COLOR_BOTTOM[1] - SKY_COLOR_TOP[1]) * t)
             b = int(SKY_COLOR_TOP[2] + (SKY_COLOR_BOTTOM[2] - SKY_COLOR_TOP[2]) * t)
-            pygame.draw.line(_bg_gradient_surface, (r, g, b), (0, y), (SCREEN_WIDTH, y))
+            pygame.draw.line(_bg_gradient_surface, (r, g, b), (0, y), (current_w, y))
 
     return _bg_gradient_surface
+
+
+def _clear_background_cache():
+    """Xóa cache background để tạo lại với kích thước mới"""
+    global _bg_gradient_surface
+    _bg_gradient_surface = None
 
 
 # --- CẤU HÌNH MÀU SẮC ---
@@ -156,8 +167,8 @@ class Menu:
         self.font_small = _get_menu_font('Arial', 20)
         self.font_hint = _get_menu_font('Arial', 16)
 
-        # Menu items
-        self.main_items = ["PVE(VS AI)", "PVP(VS PLAYER)", "Time Attack", "Endless", "Achievements", "Stats", "Train AI", "Settings", "Quit"]
+        # Menu items - Updated: Added Solo mode
+        self.main_items = ["Solo", "PVE(VS AI)", "PVP(VS PLAYER)", "Time Attack", "Endless", "Achievements", "Stats", "Train AI", "Settings", "Quit"]
         self.settings_items = ["Sound: ON", "Music: ON", "Data Collection: ON", "Difficulty: Normal", "AI Level: Medium", "Back"]
         
         self.selected = 0
@@ -176,9 +187,13 @@ class Menu:
         else:
             items = self.settings_items
         
-        center_x = SCREEN_WIDTH // 2
+        # Lấy kích thước màn hình hiện tại
+        current_w = self.screen.get_width()
+        current_h = self.screen.get_height()
+        
+        center_x = current_w // 2
         total_height = len(items) * (self.btn_height + self.btn_gap)
-        start_y = (SCREEN_HEIGHT - total_height) // 2 + 60
+        start_y = (current_h - total_height) // 2 + 60
         
         self.button_rects = []
         for i in range(len(items)):
@@ -197,12 +212,15 @@ class Menu:
             p.draw(self.screen)
 
     def draw_title_with_shadow(self, text, y_pos):
+        # Lấy kích thước màn hình hiện tại
+        current_w = self.screen.get_width()
+        
         shadow_surf = self.font_title.render(text, True, TITLE_SHADOW_COLOR)
-        shadow_rect = shadow_surf.get_rect(center=(SCREEN_WIDTH // 2 + 3, y_pos + 3))
+        shadow_rect = shadow_surf.get_rect(center=(current_w // 2 + 3, y_pos + 3))
         self.screen.blit(shadow_surf, shadow_rect)
         
         main_surf = self.font_title.render(text, True, TITLE_COLOR)
-        main_rect = main_surf.get_rect(center=(SCREEN_WIDTH // 2, y_pos))
+        main_rect = main_surf.get_rect(center=(current_w // 2, y_pos))
         self.screen.blit(main_surf, main_rect)
 
     def draw_button(self, text, rect, is_selected):
@@ -224,6 +242,10 @@ class Menu:
         text_rect = text_surf.get_rect(center=rect.center)
         self.screen.blit(text_surf, text_rect)
 
+    def _get_screen_dims(self):
+        """Lấy kích thước màn hình hiện tại"""
+        return self.screen.get_width(), self.screen.get_height()
+    
     def draw_settings_menu(self):
         self.draw_background()
         self.draw_title_with_shadow("SETTINGS", 80)
@@ -252,8 +274,9 @@ class Menu:
             self.draw_button(item, rect, i == self.selected)
         
         # Draw instructions
+        sw, sh = self._get_screen_dims()
         hint1 = self.font_hint.render("Left/Right arrows to toggle, Up/Down to select", True, (200, 200, 200))
-        self.screen.blit(hint1, (SCREEN_WIDTH // 2 - hint1.get_width() // 2, SCREEN_HEIGHT - 40))
+        self.screen.blit(hint1, (sw // 2 - hint1.get_width() // 2, sh - 40))
         
         pygame.display.flip()
 
@@ -269,11 +292,12 @@ class Menu:
         total_count = ach_obj.get_total_count()
 
         # Tiêu đề phụ
+        sw, sh = self._get_screen_dims()
         sub = self.font_small.render(
             f"Mở khóa: {unlocked_count} / {total_count}",
             True, (200, 200, 200)
         )
-        self.screen.blit(sub, (SCREEN_WIDTH // 2 - sub.get_width() // 2, 110))
+        self.screen.blit(sub, (sw // 2 - sub.get_width() // 2, 110))
 
         # Vẽ grid (3 cột)
         cols = 3
@@ -282,7 +306,7 @@ class Menu:
         gap_x = 20
         gap_y = 12
         total_w = cols * cell_w + (cols - 1) * gap_x
-        start_x = SCREEN_WIDTH // 2 - total_w // 2
+        start_x = sw // 2 - total_w // 2
         start_y = 145
 
         for idx, ach in enumerate(all_ach):
@@ -292,7 +316,7 @@ class Menu:
             cy = start_y + row * (cell_h + gap_y)
 
             # Dừng khi ra ngoài màn hình
-            if cy + cell_h > SCREEN_HEIGHT - 50:
+            if cy + cell_h > sh - 50:
                 break
 
             if ach['unlocked']:
@@ -322,7 +346,9 @@ class Menu:
 
         # Nút back
         back_rect = pygame.Rect(0, 0, 150, 45)
-        back_rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 35)
+        # Back button
+        sw, sh = self._get_screen_dims()
+        back_rect.center = (sw // 2, sh - 35)
         self.draw_button("← BACK", back_rect, self.selected == 0)
         self.button_rects = [back_rect]
 
@@ -333,6 +359,7 @@ class Menu:
         self.draw_background()
         self.draw_title_with_shadow("TRAIN AI", 80)
 
+        sw, sh = self._get_screen_dims()
         desc_lines = [
             "Chọn phương pháp huấn luyện AI:",
             "",
@@ -342,17 +369,17 @@ class Menu:
         y = 160
         for line in desc_lines:
             s = self.font_small.render(line, True, (200, 200, 200))
-            self.screen.blit(s, (SCREEN_WIDTH // 2 - s.get_width() // 2, y))
+            self.screen.blit(s, (sw // 2 - s.get_width() // 2, y))
             y += 28
 
         items = ["NEAT Training", "Supervised Training", "Back"]
         btn_w, btn_h, gap = 320, 55, 18
         total_h = len(items) * (btn_h + gap)
-        start_y = SCREEN_HEIGHT // 2 + 30
+        start_y = sh // 2 + 30
         self.button_rects = []
         for i, item in enumerate(items):
             rect = pygame.Rect(0, 0, btn_w, btn_h)
-            rect.center = (SCREEN_WIDTH // 2, start_y + i * (btn_h + gap))
+            rect.center = (sw // 2, start_y + i * (btn_h + gap))
             self.button_rects.append(rect)
 
         mouse_pos = pygame.mouse.get_pos()
@@ -426,7 +453,8 @@ class Menu:
             self.screen.blit(vs, (p1x + pw - 10 - vs.get_width(), py + 40 + i * 38))
 
         # ── Panel 2: Highscores ──
-        p2x = SCREEN_WIDTH // 2 - 130
+        sw, sh = self._get_screen_dims()
+        p2x = sw // 2 - 130
         panel2 = pygame.Surface((pw, ph), pygame.SRCALPHA)
         panel2.fill((10, 30, 20, 200))
         self.screen.blit(panel2, (p2x, py))
@@ -447,7 +475,7 @@ class Menu:
             self.screen.blit(vs, (p2x + pw - 10 - vs.get_width(), py + 40 + i * 38))
 
         # ── Panel 3: Sessions ──
-        p3x = SCREEN_WIDTH - pw - 50
+        p3x = sw - pw - 50
         panel3 = pygame.Surface((pw, ph), pygame.SRCALPHA)
         panel3.fill((30, 15, 40, 200))
         self.screen.blit(panel3, (p3x, py))
@@ -471,7 +499,7 @@ class Menu:
         # ── Bảng top scores theo mode ──
         table_y = 325
         th = self.font_hint.render("── Top Sessions theo Mode ──", True, (180, 180, 200))
-        self.screen.blit(th, (SCREEN_WIDTH // 2 - th.get_width() // 2, table_y))
+        self.screen.blit(th, (sw // 2 - th.get_width() // 2, table_y))
 
         col_labels = ["Mode", "Ván", "Avg Score", "Best"]
         col_xs = [120, 320, 500, 680]
@@ -483,7 +511,7 @@ class Menu:
             ry = table_y + 44 + ri * 26
             vals = [str(row[0]), str(row[1]), f"{float(row[2]):.0f}", str(row[3])]
             bg_col = (25, 25, 45, 180) if ri % 2 == 0 else (35, 35, 60, 180)
-            bg = pygame.Surface((SCREEN_WIDTH - 200, 24), pygame.SRCALPHA)
+            bg = pygame.Surface((sw - 200, 24), pygame.SRCALPHA)
             bg.fill(bg_col)
             self.screen.blit(bg, (100, ry))
             for ci, (v, cx) in enumerate(zip(vals, col_xs)):
@@ -493,7 +521,9 @@ class Menu:
 
         # Back button
         back_rect = pygame.Rect(0, 0, 150, 42)
-        back_rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)
+        # Back button
+        sw, sh = self._get_screen_dims()
+        back_rect.center = (sw // 2, sh - 30)
         self.draw_button("← BACK", back_rect, self.selected == 0)
         self.button_rects = [back_rect]
 
@@ -526,8 +556,9 @@ class Menu:
             self.draw_button(item, rect, i == self.selected)
 
         # Version info
+        sw, sh = self._get_screen_dims()
         hint = self.font_hint.render("v1.0 - Use Arrows + Enter or Mouse Click", True, (180, 180, 180))
-        self.screen.blit(hint, (10, SCREEN_HEIGHT - 25))
+        self.screen.blit(hint, (10, sh - 25))
 
         pygame.display.flip()
 

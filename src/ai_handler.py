@@ -89,7 +89,7 @@ def eval_genome(genome, config):
         if jump > 0.5:
             dino.jump()
         dino.duck(duck > 0.5)
-        dino.update()
+        dino.update(jump_held=False)  # AI không giữ phím
 
         if last_obstacle_x - SCREEN_WIDTH < -MIN_OBSTACLE_SPAWN_DISTANCE:
             obs = create_obstacle(SCREEN_WIDTH + 50, min(game_speed, OBSTACLE_SPEED_MAX))
