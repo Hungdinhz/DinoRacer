@@ -88,7 +88,7 @@ def eval_genome(genome, config):
         jump, duck, _ = output
         if jump > 0.5:
             dino.jump()
-        dino.duck(duck > 0.5)
+        dino.set_duck(duck > 0.5)  # AI dùng set_duck thay vì duck
         dino.update(jump_held=False)  # AI không giữ phím
 
         if last_obstacle_x - SCREEN_WIDTH < -MIN_OBSTACLE_SPAWN_DISTANCE:
@@ -112,8 +112,10 @@ def eval_genome(genome, config):
         )
 
         dino_rect = dino.get_rect()
+        # Thêm margin để AI không bị penalty quá nặng
+        margin = 4
         for obs in obstacles:
-            if dino_rect.colliderect(obs.get_rect()):
+            if dino_rect.inflate(-margin, -margin).colliderect(obs.get_rect().inflate(-margin, -margin)):
                 return score * 10
 
     return score * 10

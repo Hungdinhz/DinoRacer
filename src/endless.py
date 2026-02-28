@@ -100,26 +100,29 @@ class EndlessGame:
     
     def check_collision(self):
         dino_rect = self.dino.get_rect()
-        # Giảm margin từ 8 xuống 2 để tránh collision quá nhạy khi nhảy qua
-        margin = 2
+        # Collision với margin nhỏ để tránh collision quá nhạy
+        margin = 4  # Tăng margin một chút để fair hơn
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
         for obs in self.obstacles:
             if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):
                 return True
         return False
     
-    def update(self, keys=None):
+    def update(self, keys=None, jump_held=False):
         if self.game_over:
             return
-        
+
         # Handle input
         if keys is not None:
             if keys[pygame.K_SPACE] or keys[pygame.K_UP]:
-                self.dino.jump()
+                self.dino.jump_press()
+                jump_held = True
             if keys[pygame.K_DOWN]:
                 self.dino.duck(True)
-        
-        self.dino.update(jump_held=False)
+            else:
+                self.dino.duck(False)
+
+        self.dino.update(jump_held=jump_held)
         self.spawn_obstacle()
         
         # Update obstacles
@@ -267,17 +270,18 @@ class EndlessGame:
     
     def run(self):
         running = True
-        
+
         while running:
             self.draw()
             self.clock.tick(FPS)
-            
+
             keys = pygame.key.get_pressed()
-            
+            jump_held = False
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                
+
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         if self.collect_data:
@@ -285,13 +289,18 @@ class EndlessGame:
                         running = False
                     elif event.key == pygame.K_r and self.game_over:
                         self.reset()
-                
+                    elif event.key in (pygame.K_SPACE, pygame.K_UP):
+                        jump_held = True
+
                 if event.type == pygame.KEYUP:
+                    if event.key in (pygame.K_SPACE, pygame.K_UP):
+                        self.dino.jump_release()
                     if event.key == pygame.K_DOWN:
                         self.dino.duck(False)
-            
-            self.update(keys if not self.game_over else None)
-        
+
+            if not self.game_over:
+                self.update(keys, jump_held=jump_held)
+
         return self.score
 
 

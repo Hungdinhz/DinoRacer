@@ -8,6 +8,7 @@ from config.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y,
     INITIAL_SCORE, SPEED_INCREASE_INTERVAL, SPEED_INCREASE_AMOUNT,
     MIN_OBSTACLE_SPAWN_DISTANCE, OBSTACLE_SPEED_MIN, OBSTACLE_SPEED_MAX,
+    COLLISION_MARGIN,
 )
 from src.dino import Dino
 from src.obstacle import create_obstacle
@@ -15,6 +16,10 @@ from src.highscore import load_highscore, save_highscore
 from src.assets_loader import play_sound, load_image, CLOUD_POSITIONS
 from src.achievements import check_achievements
 from src.menu import settings as game_settings
+from src.utils import (
+    get_cached_font, get_gradient_bg, clear_gradient_cache,
+    get_hud_bg_surface, PARTICLE_COLORS, GO_RED, GO_GREEN,
+)
 
 SKY_TOP     = (100, 180, 230)
 SKY_BOT     = (255, 210, 120)
@@ -23,41 +28,9 @@ GROUND_LINE = (120, 85, 35)
 CLOUD_COL   = (255, 255, 255)
 TEXT_LIGHT  = (255, 255, 255)
 GO_BORDER   = (255, 200, 50)
-GO_RED      = (255, 215, 0)  # Gold/Yellow for GAME OVER
-GO_GREEN    = (80,  200, 80)
 
 
 # ==================== GLOBAL CACHES ====================
-# Font cache - tránh tạo font mới mỗi lần
-_font_cache = {}
-
-
-def _get_cached_font(name, size, bold=False):
-    """Lấy font từ cache, tạo mới nếu chưa có."""
-    key = (name, size, bold)
-    if key not in _font_cache:
-        _font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
-    return _font_cache[key]
-
-
-# Gradient background cache
-_gradient_cache = {}
-
-
-def _get_gradient_bg(bg_index):
-    """Cache gradient background cho mỗi bg_index."""
-    if bg_index not in _gradient_cache:
-        surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        for y in range(SCREEN_HEIGHT):
-            t = y / SCREEN_HEIGHT
-            r = int(SKY_TOP[0] + (SKY_BOT[0] - SKY_TOP[0]) * t)
-            g = int(SKY_TOP[1] + (SKY_BOT[1] - SKY_TOP[1]) * t)
-            b = int(SKY_TOP[2] + (SKY_BOT[2] - SKY_TOP[2]) * t)
-            pygame.draw.line(surf, (r, g, b), (0, y), (SCREEN_WIDTH, y))
-        _gradient_cache[bg_index] = surf
-    return _gradient_cache[bg_index]
-
-
 # Tile cache
 _tile_cache = {}
 
@@ -70,11 +43,11 @@ def _get_cached_tile(name, size):
     return _tile_cache[key]
 
 
-# ==================== PARTICLE OPTIMIZATION ====================
-# Pre-allocate particle colors
-_PARTICLE_COLORS = [
-    (255, 80, 30), (255, 180, 0), (255, 230, 80), (200, 50, 20)
-]
+def clear_game_cache():
+    """Xóa tất cả cache - gọi khi cần reset hoặc thay đổi settings."""
+    global _tile_cache
+    _tile_cache = {}
+    clear_gradient_cache()
 
 
 class Particle:
@@ -144,7 +117,7 @@ def _get_bg(bg_index):
     if bg_index not in _bg_cache:
         img = load_image(f"background/bg{bg_index}.png", (SCREEN_WIDTH, SCREEN_HEIGHT))
         if img is None:
-            img = _get_gradient_bg(bg_index)
+            img = get_gradient_bg(SCREEN_WIDTH, SCREEN_HEIGHT, bg_index, SKY_TOP, SKY_BOT)
         _bg_cache[bg_index] = img
     return _bg_cache[bg_index]
 
@@ -154,20 +127,7 @@ def clear_game_cache():
     global _bg_cache, _tile_cache
     _bg_cache = {}
     _tile_cache = {}
-
-
-# Pre-create HUD background surface (static - không cần tạo mỗi frame)
-_hud_bg_surface = None
-
-
-def _get_hud_bg():
-    """Lấy cached HUD background surface."""
-    global _hud_bg_surface
-    if _hud_bg_surface is None:
-        _hud_bg_surface = pygame.Surface((260, 70), pygame.SRCALPHA)
-        _hud_bg_surface.fill((0, 0, 0, 110))
-        pygame.draw.rect(_hud_bg_surface, (255, 200, 50, 160), (0, 0, 260, 70), 2, border_radius=8)
-    return _hud_bg_surface
+    clear_gradient_cache()
 
 
 class GameManager:
@@ -178,11 +138,11 @@ class GameManager:
         self.highscore_human, self.highscore_ai = load_highscore()
 
         # Sử dụng cached fonts thay vì tạo mới
-        self.font_hud   = _get_cached_font('Arial', 24, bold=True)
-        self.font_large = _get_cached_font('impact', 68, bold=True)
-        self.font_med   = _get_cached_font('Arial', 30, bold=True)
-        self.font_small = _get_cached_font('Arial', 20)
-        self.font_speed = _get_cached_font('Arial', 18)
+        self.font_hud   = get_cached_font('Arial', 24, bold=True)
+        self.font_large = get_cached_font('impact', 68, bold=True)
+        self.font_med   = get_cached_font('Arial', 30, bold=True)
+        self.font_small = get_cached_font('Arial', 20)
+        self.font_speed = get_cached_font('Arial', 18)
 
         self.pause_btn = pygame.Rect(SCREEN_WIDTH - 70, 10, 50, 50)
         self.clouds = [
@@ -245,8 +205,8 @@ class GameManager:
 
         # Tối ưu: lấy rect một lần, tính margin một lần
         dino_rect = self.dino.get_rect()
-        # Giảm margin từ 8 xuống 2 để tránh collision quá nhạy khi nhảy qua
-        margin = 2
+        # Sử dụng margin từ settings
+        margin = COLLISION_MARGIN
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
 
         # Early exit: kiểm tra khoảng cách trước
@@ -406,7 +366,7 @@ class GameManager:
         h = max(self.highscore_ai if self.is_ai_mode else self.highscore_human, self.score)
 
         # Sử dụng cached HUD background
-        self.screen.blit(_get_hud_bg(), (self._half_screen - 130, 5))
+        self.screen.blit(get_hud_bg_surface(), (self._half_screen - 130, 5))
 
         score_txt = self.font_hud.render(f"SCORE  {self.score:05d}", True, (255, 230, 80))
         hi_txt    = self.font_hud.render(f"HI  {h:05d}", True, (200, 200, 200))

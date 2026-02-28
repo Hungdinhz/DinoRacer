@@ -65,3 +65,45 @@ SPEED_INCREASE_AMOUNT = 0.3   # Tăng tốc chậm hơn
 # File lưu trữ
 HIGHSCORE_FILE = "highscore.json"
 BEST_GENOME_FILE = "best_genome.pkl"
+
+# ==================== GAME CONSTANTS ====================
+# Combo system
+COMBO_MAX_MULTIPLIER = 4
+COMBO_OBSTACLES_PER_LEVEL = 10
+
+# Milestone banner
+MILESTONE_STEP = 50
+MILESTANE_BANNER_DURATION = 90  # frames (1.5 seconds at 60fps)
+
+# Time Attack
+TIME_ATTACK_LIMITS = {
+    'easy': 120,    # 2 phút
+    'normal': 90,  # 1.5 phút
+    'hard': 60,     # 1 phút
+}
+
+# Difficulty multipliers
+DIFFICULTY_MULTIPLIERS = {
+    'easy': 0.7,
+    'normal': 1.0,
+    'hard': 1.3,
+}
+
+AI_DIFFICULTY_MULTIPLIERS = {
+    'easy': 0.8,
+    'medium': 1.0,
+    'hard': 1.2,
+}
+
+# Lane game
+LANE_HEIGHT = 250
+GROUND_Y_LANE = LANE_HEIGHT - 55
+
+# Collision
+COLLISION_MARGIN = 2
+
+# Achievement popup
+ACHIEVEMENT_POPUP_DURATION = 180  # 3 seconds at 60fps
+
+# Game over flash
+GAME_OVER_FLASH_FRAMES = 30
