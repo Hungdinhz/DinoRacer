@@ -128,7 +128,7 @@ class TimeAttackGame:
     
     def draw_background(self):
         # Sử dụng cached gradient background
-        self.screen.blit(_get_gradient_bg(), (0, 0))
+        self.screen.blit(get_gradient_bg(SCREEN_WIDTH, SCREEN_HEIGHT), (0, 0))
 
         # Ground
         pygame.draw.rect(self.screen, GROUND_COL, (0, GROUND_Y, SCREEN_WIDTH, SCREEN_HEIGHT - GROUND_Y))

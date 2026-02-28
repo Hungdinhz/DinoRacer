@@ -6,10 +6,14 @@ Sprite sheets trong assets/images/dino/:
   jump.png  (96x24)  = 4 frames
   bow.png   (144x24) = 6 frames  (cúi)
 """
+from __future__ import annotations
+
 import pygame
+import math
+from typing import Optional, Tuple, List
+
 import config.settings as game_settings
 from src.assets_loader import get_sheet, play_sound
-import math
 
 # Lấy giá trị từ settings
 DINO_X = game_settings.DINO_X
@@ -26,39 +30,39 @@ JUMP_BUFFER = getattr(game_settings, 'JUMP_BUFFER', 8)
 DUCK_HEIGHT_RATIO = game_settings.DUCK_HEIGHT_RATIO
 
 # Số frame của mỗi animation
-_ANIM_FRAMES = {"idle": 3, "move": 6, "jump": 4, "bow": 6}
+_ANIM_FRAMES: dict[str, int] = {"idle": 3, "move": 6, "jump": 4, "bow": 6}
 # Game-frames mỗi sprite-frame
-_ANIM_SPEED  = {"idle": 10, "move": 5, "jump": 8, "bow": 5}
+_ANIM_SPEED: dict[str, int] = {"idle": 10, "move": 5, "jump": 8, "bow": 5}
 
 
 class Dino:
-    # Bỏ __slots__ để tránh vấn đề với dynamic attributes
+    # Type hints as inline comments for compatibility
 
-    def __init__(self, x=DINO_X, folder="dino"):
-        self.x = x
-        self.y = GROUND_Y - DINO_HEIGHT
-        self.base_y = GROUND_Y - DINO_HEIGHT  # Vị trí ground chuẩn
-        self.width = DINO_WIDTH
-        self.height = DINO_HEIGHT
-        self.vel_y = 0
-        self.is_jumping = False
-        self.is_ducking = False
-        self.is_on_ground = True
-        self.color = DINO_COLOR
-        self.folder = folder   # "dino" hoặc "ai_dino"
-        self.anim_frame = 0
-        self.anim_timer = 0
-        self._cur_anim = "move"
+    def __init__(self, x: int = DINO_X, folder: str = "dino") -> None:
+        self.x: int = x
+        self.y: float = GROUND_Y - DINO_HEIGHT
+        self.base_y: float = GROUND_Y - DINO_HEIGHT  # Vị trí ground chuẩn
+        self.width: int = DINO_WIDTH
+        self.height: int = DINO_HEIGHT
+        self.vel_y: float = 0
+        self.is_jumping: bool = False
+        self.is_ducking: bool = False
+        self.is_on_ground: bool = True
+        self.color: Tuple[int, int, int] = DINO_COLOR
+        self.folder: str = folder   # "dino" hoặc "ai_dino"
+        self.anim_frame: int = 0
+        self.anim_timer: int = 0
+        self._cur_anim: str = "move"
         # Cache rect để tránh tạo mới mỗi frame
-        self._cached_rect = None
+        self._cached_rect: Optional[pygame.Rect] = None
         # Ground y cho lane game
-        self.ground_y = GROUND_Y
+        self.ground_y: int = GROUND_Y
 
         # Smooth physics
-        self._coyote_timer = 0        # Đếm thời gian sau khi rời ground
-        self._jump_buffer_timer = 0   # Đếm thời gian trước khi chạm ground
-        self._was_jumping = False     # Track trạng thái jumping trước đó
-        self._jump_held = False       # Track xem phím jump có đang được giữ
+        self._coyote_timer: int = 0        # Đếm thời gian sau khi rời ground
+        self._jump_buffer_timer: int = 0   # Đếm thời gian trước khi chạm ground
+        self._was_jumping: bool = False     # Track trạng thái jumping trước đó
+        self._jump_held: bool = False       # Track xem phím jump có đang được giữ
 
         # Squash & stretch
         self._scale_x = 1.0
