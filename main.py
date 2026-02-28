@@ -108,8 +108,18 @@ def main():
             game.run_human_mode()
 
         elif choice == 'PVE(VS AI)':
+            # Hoi nguoi choi chon loai AI
+            print("\nChon loai AI:")
+            print("1. NEAT (khuyen nghi - da duoc train)")
+            print("2. Supervised (can train tu PVP truoc)")
+            ai_choice = input("Nhap lua chon (1-2): ").strip()
+
+            ai_type = 'neat'
+            if ai_choice == '2':
+                ai_type = 'supervised'
+
             game = GameManager(screen)
-            game.run_pve_mode()
+            game.run_pve_mode(ai_type=ai_type)
 
         elif choice == 'PVP(VS PLAYER)':
             game = GameManager(screen)

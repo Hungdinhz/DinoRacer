@@ -486,10 +486,10 @@ class GameManager:
         txt = self.font_large.render("PAUSED", True, (255, 230, 100))
         self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH // 2, py + 100)))
 
-        hint = self.font_small.render("Nhấn  P  để tiếp tục", True, (180, 180, 200))
+        hint = self.font_small.render("Press  P  to Resume", True, (180, 180, 200))
         self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, py + 145)))
 
-        hint2 = self.font_small.render("ESC - Menu chính", True, (120, 120, 150))
+        hint2 = self.font_small.render("ESC - Main Menu", True, (120, 120, 150))
         self.screen.blit(hint2, hint2.get_rect(center=(SCREEN_WIDTH // 2, py + 170)))
 
     def _draw_game_over(self):
@@ -556,10 +556,10 @@ class GameManager:
         pygame.draw.rect(self.screen, (100, 200, 100), r_box, 2, border_radius=8)
 
         r_symbol = self.font_med.render("⟳", True, GO_GREEN)
-        r_txt = self.font_med.render("THỬ LẠI", True, GO_GREEN)
+        r_txt = self.font_med.render("RETRY", True, GO_GREEN)
         self.screen.blit(r_symbol, r_symbol.get_rect(center=(r_box.x + 30, r_box.centery)))
         self.screen.blit(r_txt, r_txt.get_rect(center=(r_box.x + 100, r_box.centery)))
-        r_hint = self.font_small.render("Phím R", True, (150, 180, 150))
+        r_hint = self.font_small.render("Press R", True, (150, 180, 150))
         self.screen.blit(r_hint, r_hint.get_rect(center=(r_box.x + 100, r_box.bottom - 8)))
 
         m_box = pygame.Rect(px + pw - 220, py + 185, 180, 45)
@@ -568,9 +568,9 @@ class GameManager:
 
         m_symbol = self.font_med.render("☰", True, (180, 180, 255))
         m_txt = self.font_med.render("MENU", True, (180, 180, 255))
+        m_hint = self.font_small.render("Press ESC", True, (150, 150, 200))
         self.screen.blit(m_symbol, m_symbol.get_rect(center=(m_box.x + 30, m_box.centery)))
         self.screen.blit(m_txt, m_txt.get_rect(center=(m_box.x + 100, m_box.centery)))
-        m_hint = self.font_small.render("Phím ESC", True, (150, 150, 200))
         self.screen.blit(m_hint, m_hint.get_rect(center=(m_box.x + 100, m_box.bottom - 8)))
 
     def _draw_achievement_popup(self):
@@ -597,7 +597,7 @@ class GameManager:
         icon = self.ach_popup_item.get('icon', '🏆')
         name = self.ach_popup_item.get('name', 'Achievement')
 
-        header = self.font_small.render("✨ THÀNH TỰU MỚI!", True, (255, 200, 50))
+        header = self.font_small.render("NEW ACHIEVEMENT!", True, (255, 200, 50))
         self.screen.blit(header, (px + 8, py + 6))
         name_surf = self.font_small.render(f"{icon} {name}", True, (255, 255, 255))
         self.screen.blit(name_surf, (px + 8, py + 32))
@@ -684,17 +684,50 @@ class GameManager:
             self.draw()
             self.clock.tick(FPS)
 
-    def run_pve_mode(self):
+    def run_pve_mode(self, ai_type='neat'):
+        """
+        Chạy chế độ PVE.
+        ai_type: 'neat' hoặc 'supervised'
+        """
         from src.lane_game import LaneGame, LANE_H
         from src.ai_handler import load_genome, _get_inputs_from_lane
         import neat
-        genome, config = load_genome()
-        net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
-        ai_lane     = LaneGame('ai_dino', 'AI',       label_color=(200, 150, 255))
+
+        # Load AI
+        net = None
+        jump_model, duck_model = None, None
+        jump_scaler, duck_scaler = None, None
+
+        if ai_type == 'neat':
+            genome, config = load_genome()
+            net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
+            ai_label = "AI (NEAT)"
+        else:
+            # Load supervised models
+            try:
+                from src.supervised_trainer import load_models, predict_action
+                jump_data, duck_data = load_models()
+                if jump_data and duck_data:
+                    jump_model, jump_scaler = jump_data['model'], jump_data['scaler']
+                    duck_model, duck_scaler = duck_data['model'], duck_data['scaler']
+                    ai_label = "AI (Supervised)"
+                else:
+                    print("Khong load duoc supervised model! Dung NEAT...")
+                    genome, config = load_genome()
+                    net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
+                    ai_label = "AI (NEAT)"
+            except Exception as e:
+                print(f"Loi load supervised: {e}. Dung NEAT...")
+                genome, config = load_genome()
+                net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
+                ai_label = "AI (NEAT)"
+
+        ai_lane     = LaneGame('ai_dino', ai_label, label_color=(200, 150, 255))
         player_lane = LaneGame('dino',    'PLAYER',   label_color=(255, 230, 80))
         div = pygame.Surface((SCREEN_WIDTH, 4)); div.fill((255, 200, 50))
-        font_hint = pygame.font.SysFont('Arial', 16)
+        font_hint = get_cached_font('Arial', 16)
         running = True
+
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: running = False
@@ -709,61 +742,127 @@ class GameManager:
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
                         player_lane.dino.jump_release()
                     if event.key == pygame.K_DOWN: player_lane.dino.duck(False)
-            if net and not ai_lane.game_over:
-                ai_lane.update(action=net.activate(_get_inputs_from_lane(ai_lane)))
+
+            if not ai_lane.game_over:
+                if ai_type == 'neat' and net:
+                    ai_lane.update(action=net.activate(_get_inputs_from_lane(ai_lane)))
+                elif ai_type == 'supervised' and jump_model and duck_model:
+                    # Get inputs for supervised model
+                    from src.ai_handler import _get_inputs
+                    inputs = _get_inputs(ai_lane.dino, ai_lane.obstacles, ai_lane.game_speed)
+                    action = predict_action(jump_model, jump_scaler, duck_model, duck_scaler, inputs)
+                    ai_lane.update(action=action[:3])  # Take first 3 values
+                else:
+                    ai_lane.update()
             else:
                 ai_lane.update()
+
             player_lane.update()
             ai_lane.draw(); player_lane.draw()
             self.screen.blit(ai_lane.surface, (0, 0))
             self.screen.blit(div, (0, LANE_H))
             self.screen.blit(player_lane.surface, (0, LANE_H + 4))
             if ai_lane.game_over or player_lane.game_over:
-                hint = font_hint.render('R - Choi lai  |  ESC - Menu', True, (220, 220, 220))
+                hint = font_hint.render('R - Retry  |  ESC - Menu', True, (220, 220, 220))
                 self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, LANE_H * 2 + 4 - 12)))
             pygame.display.flip(); self.clock.tick(FPS)
 
     def run_pvp_mode(self):
         from src.lane_game import LaneGame, LANE_H
+        from src.utils import get_cached_font
+
         p1 = LaneGame('dino',    'PLAYER 1', label_color=(255, 230, 80),   collect_data=True, player_type="human")
         p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255),  collect_data=True, player_type="ai")
-        div = pygame.Surface((SCREEN_WIDTH, 4)); div.fill((255, 200, 50))
-        font_res  = pygame.font.SysFont('Arial', 22, bold=True)
-        font_hint = pygame.font.SysFont('Arial', 16)
+
+        div = pygame.Surface((SCREEN_WIDTH, 4))
+        div.fill((255, 200, 50))
+
+        font_res  = get_cached_font('Arial', 22, bold=True)
+        font_hint = get_cached_font('Arial', 16)
+
         running = True
+
         while running:
+            # Đọc phím liên tục để P2 (W/S) nhận input mượt hơn
+            keys = pygame.key.get_pressed()
+
+            # Tạo action cho P1 (Space/Up/Down)
+            p1_action = None
+            if not p1.game_over:
+                p1_jump = 1 if (keys[pygame.K_SPACE] or keys[pygame.K_UP]) else 0
+                p1_duck = 1 if keys[pygame.K_DOWN] else 0
+                p1_action = (p1_jump, p1_duck)
+
+            # Tạo action cho P2 (W/S)
+            p2_action = None
+            if not p2.game_over:
+                p2_jump = 1 if keys[pygame.K_w] else 0
+                p2_duck = 1 if keys[pygame.K_s] else 0
+                p2_action = (p2_jump, p2_duck)
+
             for event in pygame.event.get():
-                if event.type == pygame.QUIT: running = False
+                if event.type == pygame.QUIT:
+                    running = False
                 if event.type == pygame.KEYDOWN:
+                    # P1 controls
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
-                        if not p1.game_over: p1.dino.jump_press()
+                        if not p1.game_over:
+                            p1.dino.jump_press()
                     if event.key == pygame.K_DOWN:
-                        if not p1.game_over: p1.dino.duck(True)
+                        if not p1.game_over:
+                            p1.dino.duck(True)
+                    # P2 controls
                     if event.key == pygame.K_w:
-                        if not p2.game_over: p2.dino.jump_press()
+                        if not p2.game_over:
+                            p2.dino.jump_press()
                     if event.key == pygame.K_s:
-                        if not p2.game_over: p2.dino.duck(True)
-                    if event.key == pygame.K_r: p1.reset(); p2.reset()
-                    if event.key == pygame.K_ESCAPE: running = False
+                        if not p2.game_over:
+                            p2.dino.duck(True)
+                    # Game controls
+                    if event.key == pygame.K_r:
+                        p1.reset()
+                        p2.reset()
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+
                 if event.type == pygame.KEYUP:
+                    # P1 release
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
                         p1.dino.jump_release()
+                    if event.key == pygame.K_DOWN:
+                        p1.dino.duck(False)
+                    # P2 release
                     if event.key == pygame.K_w:
                         p2.dino.jump_release()
-                    if event.key == pygame.K_DOWN: p1.dino.duck(False)
-                    if event.key == pygame.K_s: p2.dino.duck(False)
-            p1.update(); p2.update()
-            p1.draw(); p2.draw()
+                    if event.key == pygame.K_s:
+                        p2.dino.duck(False)
+
+            # Update cả hai lane - truyền action cho cả hai người chơi
+            p1.update(player_action=p1_action)
+            p2.update(player_action=p2_action)
+
+            # Draw
+            p1.draw()
+            p2.draw()
             self.screen.blit(p1.surface, (0, 0))
             self.screen.blit(div, (0, LANE_H))
             self.screen.blit(p2.surface, (0, LANE_H + 4))
+
+            # Hiển thị kết quả khi cả hai game over
             if p1.game_over and p2.game_over:
-                if p1.score > p2.score: msg, col = f'P1 THẮNG! ({p1.score} vs {p2.score})', (255, 230, 80)
-                elif p2.score > p1.score: msg, col = f'P2 THẮNG! ({p2.score} vs {p1.score})', (200, 150, 255)
-                else: msg, col = f'HÒA! ({p1.score})', (200, 200, 200)
+                if p1.score > p2.score:
+                    msg, col = f'P1 THẮNG! ({p1.score} vs {p2.score})', (255, 230, 80)
+                elif p2.score > p1.score:
+                    msg, col = f'P2 THẮNG! ({p2.score} vs {p1.score})', (200, 150, 255)
+                else:
+                    msg, col = f'HÒA! ({p1.score})', (200, 200, 200)
                 res = font_res.render(msg, True, col)
                 self.screen.blit(res, res.get_rect(center=(SCREEN_WIDTH // 2, LANE_H + 2)))
+
+            # Hiển thị hint khi có người game over
             if p1.game_over or p2.game_over:
-                hint = font_hint.render('R - Chơi lại  |  ESC - Menu', True, (220, 220, 220))
+                hint = font_hint.render('R - Retry  |  ESC - Menu', True, (220, 220, 220))
                 self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, LANE_H * 2 + 4 - 12)))
-            pygame.display.flip(); self.clock.tick(FPS)
+
+            pygame.display.flip()
+            self.clock.tick(FPS)

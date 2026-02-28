@@ -134,7 +134,8 @@ class LaneGame:
         self.bg_offset = 0
         self.bg_index = 1
         self.go_flash_timer = 0
-        
+        self._data_saved = False  # Reset data saved flag
+
         self.last_action = (0, 0)
         self.frame_count = 0
 
@@ -264,8 +265,11 @@ class LaneGame:
     def update(self, action=None, player_action=None):
         if self.game_over:
             self.go_flash_timer += 1
-            if self.collect_data and len(get_collector().current_session_data) > 0:
-                get_collector().save_session_data()
+            # Chỉ save data một lần khi mới game over
+            if self.collect_data and hasattr(self, '_data_saved') and not self._data_saved:
+                if len(get_collector().current_session_data) > 0:
+                    get_collector().save_session_data()
+                self._data_saved = True
             return
 
         actual_action = (0, 0)
@@ -415,8 +419,8 @@ class LaneGame:
             go = self.font_go.render("GAME OVER", True, (255, 215, 0))  # Yellow/Gold
             surf.blit(go, go.get_rect(center=(LANE_W // 2, py + 40)))
 
-            score_txt = self.font_label.render(f"Diem: {self.score:05d}", True, (255, 230, 80))
+            score_txt = self.font_label.render(f"Score: {self.score:05d}", True, (255, 230, 80))
             surf.blit(score_txt, score_txt.get_rect(center=(LANE_W // 2, py + 80)))
 
-            hint = self.font_small.render("R - Thu lai  |  ESC - Menu", True, (200, 200, 200))
+            hint = self.font_small.render("R - Retry  |  ESC - Menu", True, (200, 200, 200))
             surf.blit(hint, hint.get_rect(center=(LANE_W // 2, py + 115)))

@@ -1,28 +1,28 @@
 [NEAT]
 fitness_criterion     = max
-fitness_threshold     = 10000
+fitness_threshold     = 50000
 no_fitness_termination = False
-pop_size              = 50
-reset_on_extinction   = False
+pop_size              = 80
+reset_on_extinction   = True
 
 [DefaultGenome]
 # node activation options
 activation_default      = tanh
-activation_mutate_rate  = 0.0
-activation_options      = tanh
+activation_mutate_rate  = 0.1
+activation_options      = tanh sigmoid
 
 # node aggregation options
 aggregation_default     = sum
 aggregation_mutate_rate = 0.0
-aggregation_options     = sum
+aggregation_options     = sum product
 
 # node bias options
 bias_init_mean          = 0.0
-bias_init_stdev         = 1.0
+bias_init_stdev         = 0.5
 bias_init_type          = gaussian
 bias_max_value          = 30.0
 bias_min_value          = -30.0
-bias_mutate_power       = 0.5
+bias_mutate_power       = 0.3
 bias_mutate_rate        = 0.7
 bias_replace_rate       = 0.1
 
@@ -31,14 +31,14 @@ compatibility_disjoint_coefficient = 1.0
 compatibility_weight_coefficient   = 0.5
 
 # connection add/remove rates
-conn_add_prob           = 0.5
-conn_delete_prob        = 0.5
+conn_add_prob           = 0.3
+conn_delete_prob        = 0.2
 
 # connection enable options
 enabled_default         = True
-enabled_mutate_rate     = 0.01
-enabled_rate_to_true_add  = 0.0
-enabled_rate_to_false_add = 0.0
+enabled_mutate_rate     = 0.05
+enabled_rate_to_true_add  = 0.1
+enabled_rate_to_false_add = 0.1
 
 feed_forward            = True
 initial_connection      = full_nodirect
@@ -46,11 +46,11 @@ single_structural_mutation = False
 structural_mutation_surer  = default
 
 # node add/remove rates
-node_add_prob           = 0.2
-node_delete_prob        = 0.2
+node_add_prob           = 0.15
+node_delete_prob        = 0.1
 
 # network parameters
-num_hidden              = 2
+num_hidden              = 4
 num_inputs              = 8
 num_outputs             = 3
 
@@ -66,23 +66,23 @@ response_replace_rate   = 0.0
 
 # connection weight options
 weight_init_mean        = 0.0
-weight_init_stdev       = 1.0
+weight_init_stdev       = 0.5
 weight_init_type        = gaussian
 weight_max_value        = 30
 weight_min_value        = -30
-weight_mutate_power     = 0.5
-weight_mutate_rate      = 0.8
+weight_mutate_power     = 0.3
+weight_mutate_rate      = 0.7
 weight_replace_rate     = 0.1
 
 [DefaultSpeciesSet]
-compatibility_threshold = 3.0
+compatibility_threshold = 2.5
 
 [DefaultStagnation]
 species_fitness_func = max
-max_stagnation       = 20
-species_elitism      = 2
+max_stagnation       = 30
+species_elitism      = 3
 
 [DefaultReproduction]
-elitism            = 2
-survival_threshold = 0.2
+elitism            = 3
+survival_threshold = 0.3
 min_species_size   = 1

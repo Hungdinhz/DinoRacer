@@ -166,7 +166,7 @@ class Menu:
 
         # Scrolling
         self.scroll_offset = 0
-        self.max_visible_buttons = 6  # Tăng để hiển thị nhiều button hơn
+        self.max_visible_buttons = 5  # Tăng để hiển thị nhiều button hơn
         self.is_scrolling = False
 
         # Animation
@@ -542,18 +542,18 @@ class Menu:
                 mode_v = str(row[0]).upper()
                 total_v = str(row[1])
                 avg_v = f"{float(row[2]):.1f}"
-                label = font_h.render(f"{mode_v}: {total_v} ván  avg {avg_v}", True, (200, 180, 220))
+                label = font_h.render(f"{mode_v}: {total_v} games  avg {avg_v}", True, (200, 180, 220))
                 self.screen.blit(label, (p3x + 10, py + 40 + i * 38))
         else:
-            no_data = font_h.render("Chưa có dữ liệu", True, (140, 120, 160))
+            no_data = font_h.render("No data yet", True, (140, 120, 160))
             self.screen.blit(no_data, (p3x + 10, py + 60))
 
         # ── Bảng top scores theo mode ──
         table_y = 325
-        th = self.font_hint.render("── Top Sessions theo Mode ──", True, (180, 180, 200))
+        th = self.font_hint.render("── Top Sessions by Mode ──", True, (180, 180, 200))
         self.screen.blit(th, (sw // 2 - th.get_width() // 2, table_y))
 
-        col_labels = ["Mode", "Ván", "Avg Score", "Best"]
+        col_labels = ["Mode", "Games", "Avg Score", "Best"]
         col_xs = [120, 320, 500, 680]
         for ci, (lbl, cx) in enumerate(zip(col_labels, col_xs)):
             ls = self.font_hint.render(lbl, True, (200, 200, 255))
