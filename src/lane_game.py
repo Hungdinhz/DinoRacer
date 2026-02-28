@@ -8,30 +8,18 @@ import math
 from config.settings import (
     SCREEN_WIDTH, SPEED_INCREASE_INTERVAL, SPEED_INCREASE_AMOUNT,
     MIN_OBSTACLE_SPAWN_DISTANCE, OBSTACLE_SPEED_MIN, OBSTACLE_SPEED_MAX,
-    INITIAL_SCORE,
+    INITIAL_SCORE, COLLISION_MARGIN, LANE_HEIGHT,
 )
 from src.dino import Dino
 from src.obstacle import create_obstacle
 from src.assets_loader import play_sound, load_image
 from src.data_collector import get_collector
+from src.utils import get_cached_font
 
-# ==================== GLOBAL CACHES ====================
-# Font cache - tránh tạo font mới mỗi lần
-_lane_font_cache = {}
-
-
-def _get_lane_font(name, size, bold=False):
-    """Lấy font từ cache cho lane game."""
-    key = (name, size, bold)
-    if key not in _lane_font_cache:
-        _lane_font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
-    return _lane_font_cache[key]
-
-
-# Chiều cao mỗi lane = nửa màn hình (điều chỉnh theo màn hình)
-LANE_H = 360  # Nửa màn hình 720
+# Chiều cao mỗi lane
+LANE_H = LANE_HEIGHT
 LANE_W = SCREEN_WIDTH
-GROUND_Y_LANE = LANE_H - 60   # mặt đất trong lane
+GROUND_Y_LANE = LANE_H - 55   # mặt đất trong lane
 
 SKY_TOP    = (100, 180, 230)
 SKY_BOT    = (255, 210, 120)
@@ -114,12 +102,12 @@ class LaneGame:
         self.surface = pygame.Surface((LANE_W, LANE_H))
 
         # Sử dụng cached fonts thay vì tạo mới
-        self.font_hud   = _get_lane_font("Arial", 20, bold=True)
-        self.font_label = _get_lane_font("Arial", 18, bold=True)
-        self.font_go    = _get_lane_font(
+        self.font_hud   = get_cached_font("Arial", 20, bold=True)
+        self.font_label = get_cached_font("Arial", 18, bold=True)
+        self.font_go    = get_cached_font(
             "impact" if "impact" in pygame.font.get_fonts() else "arial",
             42, bold=True)
-        self.font_small = _get_lane_font("Arial", 16)
+        self.font_small = get_cached_font("Arial", 16)
 
         self.clouds = [LaneCloud(random.randint(0, LANE_W)) for _ in range(4)]
         self.ground_offset = 0
@@ -205,15 +193,14 @@ class LaneGame:
             self.last_obstacle_x = obs.x
 
     def check_collision(self):
-        from config.settings import DINO_HEIGHT
+        from config.settings import DINO_HEIGHT, DUCK_HEIGHT_RATIO, COLLISION_MARGIN
         d = self.dino
         h = d.height
         if d.is_ducking:
-            from config.settings import DUCK_HEIGHT_RATIO
             h = int(d.height * DUCK_HEIGHT_RATIO)
         dino_rect = pygame.Rect(d.x, d.y + (d.height - h), d.width, h)
-        # Giảm margin từ 6 xuống 2 để tránh collision quá nhạy khi nhảy qua
-        margin = 2
+        # Sử dụng margin từ settings
+        margin = COLLISION_MARGIN
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
         for obs in self.obstacles:
             if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):

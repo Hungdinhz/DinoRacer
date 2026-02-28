@@ -7,50 +7,25 @@ from config.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y,
     INITIAL_SCORE, SPEED_INCREASE_INTERVAL, SPEED_INCREASE_AMOUNT,
     MIN_OBSTACLE_SPAWN_DISTANCE, OBSTACLE_SPEED_MIN, OBSTACLE_SPEED_MAX,
+    COLLISION_MARGIN, COMBO_MAX_MULTIPLIER, COMBO_OBSTACLES_PER_LEVEL,
+    MILESTONE_STEP, MILESTANE_BANNER_DURATION,
 )
 from src.dino import Dino
 from src.obstacle import create_obstacle
 from src.highscore import load_highscore, save_highscore
 from src.assets_loader import play_sound
 from src.data_collector import get_collector
-
-# ==================== GLOBAL CACHES ====================
-# Pre-create gradient background surface
-_endless_gradient_bg = None
-
-
-def _get_endless_bg():
-    """Cache gradient background surface."""
-    global _endless_gradient_bg
-    if _endless_gradient_bg is None:
-        _endless_gradient_bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        SKY_TOP = (100, 180, 230)
-        SKY_BOT = (255, 210, 120)
-        for y in range(SCREEN_HEIGHT):
-            t = y / SCREEN_HEIGHT
-            r = int(SKY_TOP[0] + (SKY_BOT[0] - SKY_TOP[0]) * t)
-            g = int(SKY_TOP[1] + (SKY_BOT[1] - SKY_TOP[1]) * t)
-            b = int(SKY_TOP[2] + (SKY_BOT[2] - SKY_TOP[2]) * t)
-            pygame.draw.line(_endless_gradient_bg, (r, g, b), (0, y), (SCREEN_WIDTH, y))
-    return _endless_gradient_bg
-
-
-# Font cache
-_endless_font_cache = {}
-
-
-def _get_endless_font(name, size, bold=False):
-    """Lấy font từ cache."""
-    key = (name, size, bold)
-    if key not in _endless_font_cache:
-        _endless_font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
-    return _endless_font_cache[key]
-
+from src.utils import get_cached_font, get_gradient_bg
 
 SKY_TOP = (100, 180, 230)
 SKY_BOT = (255, 210, 120)
 GROUND_COL = (160, 120, 60)
 GROUND_LINE = (120, 85, 35)
+
+
+def _get_endless_bg():
+    """Lấy gradient background cho endless mode."""
+    return get_gradient_bg(SCREEN_WIDTH, SCREEN_HEIGHT, 0, SKY_TOP, SKY_BOT)
 
 
 class EndlessGame:
@@ -61,9 +36,9 @@ class EndlessGame:
         self.clock = pygame.time.Clock()
 
         # Sử dụng cached fonts thay vì tạo mới
-        self.font_title = _get_endless_font('Arial', 60, bold=True)
-        self.font_hud = _get_endless_font('Arial', 28, bold=True)
-        self.font_small = _get_endless_font('Arial', 20)
+        self.font_title = get_cached_font('Arial', 60, bold=True)
+        self.font_hud = get_cached_font('Arial', 28, bold=True)
+        self.font_small = get_cached_font('Arial', 20)
 
         self.highscore = load_highscore()[0]
 
@@ -100,8 +75,8 @@ class EndlessGame:
     
     def check_collision(self):
         dino_rect = self.dino.get_rect()
-        # Collision với margin nhỏ để tránh collision quá nhạy
-        margin = 4  # Tăng margin một chút để fair hơn
+        # Sử dụng margin từ settings
+        margin = COLLISION_MARGIN
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
         for obs in self.obstacles:
             if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):
@@ -132,7 +107,7 @@ class EndlessGame:
                 obs.passed = True
                 self.combo_count += 1
                 # Combo multiplier: mỗi 10 obstacle liên tiếp tăng 1 bậc, tối đa 4x
-                self.combo_mult = min(1 + self.combo_count // 10, 4)
+                self.combo_mult = min(1 + self.combo_count // COMBO_OBSTACLES_PER_LEVEL, COMBO_MAX_MULTIPLIER)
                 self.score += self.combo_mult
         
         self.obstacles = [o for o in self.obstacles if not o.is_off_screen()]
@@ -140,12 +115,12 @@ class EndlessGame:
             self.last_obstacle_x = max(o.x for o in self.obstacles)
 
         # Milestone banner
-        milestone_step = 50
+        milestone_step = MILESTONE_STEP
         current_milestone = (self.score // milestone_step) * milestone_step
         if current_milestone > self.last_milestone and current_milestone > 0:
             self.last_milestone = current_milestone
             self.milestone_text = f"{current_milestone} 🎯 PASSED!"
-            self.milestone_timer = 90  # 1.5 giây
+            self.milestone_timer = MILESTANE_BANNER_DURATION
         if self.milestone_timer > 0:
             self.milestone_timer -= 1
 

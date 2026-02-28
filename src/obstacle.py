@@ -90,13 +90,12 @@ class Bird(Obstacle):
     """Chim với animation và __slots__"""
     __slots__ = ('width', 'height', 'y', 'anim_frame', 'anim_timer', '_anim')
 
-    HEIGHTS = [GROUND_Y - 130, GROUND_Y - 85, GROUND_Y - 50]
-
     def __init__(self, x, speed):
         super().__init__(x, speed)
         self.width = BIRD_WIDTH
         self.height = BIRD_HEIGHT
-        self.y = random.choice(self.HEIGHTS)
+        # Calculate heights dynamically based on GROUND_Y
+        self.y = random.choice([GROUND_Y - 130, GROUND_Y - 85, GROUND_Y - 50])
         self.anim_frame = 0
         self.anim_timer = 0
         self._anim = "move"   # dùng move.png làm animation chính

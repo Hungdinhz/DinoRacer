@@ -7,44 +7,13 @@ from config.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y,
     INITIAL_SCORE, SPEED_INCREASE_INTERVAL, SPEED_INCREASE_AMOUNT,
     MIN_OBSTACLE_SPAWN_DISTANCE, OBSTACLE_SPEED_MIN, OBSTACLE_SPEED_MAX,
+    COLLISION_MARGIN, TIME_ATTACK_LIMITS,
 )
 from src.dino import Dino
 from src.obstacle import create_obstacle
 from src.assets_loader import play_sound
 from src.data_collector import get_collector
-
-# ==================== GLOBAL CACHES ====================
-# Pre-create gradient background surface
-_gradient_bg_surface = None
-
-
-def _get_gradient_bg():
-    """Cache gradient background surface."""
-    global _gradient_bg_surface
-    if _gradient_bg_surface is None:
-        _gradient_bg_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        SKY_TOP = (100, 180, 230)
-        SKY_BOT = (255, 210, 120)
-        for y in range(SCREEN_HEIGHT):
-            t = y / SCREEN_HEIGHT
-            r = int(SKY_TOP[0] + (SKY_BOT[0] - SKY_TOP[0]) * t)
-            g = int(SKY_TOP[1] + (SKY_BOT[1] - SKY_TOP[1]) * t)
-            b = int(SKY_TOP[2] + (SKY_BOT[2] - SKY_TOP[2]) * t)
-            pygame.draw.line(_gradient_bg_surface, (r, g, b), (0, y), (SCREEN_WIDTH, y))
-    return _gradient_bg_surface
-
-
-# Font cache
-_time_attack_font_cache = {}
-
-
-def _get_time_attack_font(name, size, bold=False):
-    """Lấy font từ cache."""
-    key = (name, size, bold)
-    if key not in _time_attack_font_cache:
-        _time_attack_font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
-    return _time_attack_font_cache[key]
-
+from src.utils import get_cached_font, get_gradient_bg
 
 SKY_TOP = (100, 180, 230)
 SKY_BOT = (255, 210, 120)
@@ -54,12 +23,7 @@ GROUND_LINE = (120, 85, 35)
 
 class TimeAttackGame:
     """Chế độ Time Attack - vượt obstacle trong thời gian giới hạn"""
-    
-    TIME_LIMITS = {
-        'easy': 120,    # 2 phút
-        'normal': 90,   # 1.5 phút
-        'hard': 60,     # 1 phút
-    }
+    TIME_LIMITS = TIME_ATTACK_LIMITS
     
     def __init__(self, screen, difficulty='normal'):
         self.screen = screen
@@ -68,9 +32,9 @@ class TimeAttackGame:
         self.time_limit = self.TIME_LIMITS.get(difficulty, 90)  # seconds
 
         # Sử dụng cached fonts thay vì tạo mới
-        self.font_title = _get_time_attack_font('Arial', 60, bold=True)
-        self.font_hud = _get_time_attack_font('Arial', 28, bold=True)
-        self.font_small = _get_time_attack_font('Arial', 20)
+        self.font_title = get_cached_font('Arial', 60, bold=True)
+        self.font_hud = get_cached_font('Arial', 28, bold=True)
+        self.font_small = get_cached_font('Arial', 20)
 
         self.reset()
     
@@ -98,8 +62,8 @@ class TimeAttackGame:
     
     def check_collision(self):
         dino_rect = self.dino.get_rect()
-        # Collision với margin nhỏ để tránh collision quá nhạy
-        margin = 4  # Tăng margin một chút để fair hơn
+        # Sử dụng margin từ settings
+        margin = COLLISION_MARGIN
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
         for obs in self.obstacles:
             if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):

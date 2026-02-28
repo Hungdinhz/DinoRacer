@@ -161,7 +161,7 @@ def run_best_genome_display(genome, config):
         if not gm.game_over:
             inputs = _get_inputs(gm.dino, gm.obstacles, gm.game_speed)
             output = net.activate(inputs)
-            gm.update(action=output)
+            gm.update(action=output, jump_held=False)
         
         gm.draw()
         clock.tick(FPS)

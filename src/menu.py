@@ -3,20 +3,8 @@ Menu - Menu chính của game với các lựa chọn
 """
 import pygame
 import random
-from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
-
-# ==================== GLOBAL CACHES ====================
-# Font cache - tránh tạo font mới mỗi lần
-_menu_font_cache = {}
-
-
-def _get_menu_font(name, size, bold=False):
-    """Lấy font từ cache cho menu."""
-    key = (name, size, bold)
-    if key not in _menu_font_cache:
-        _menu_font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
-    return _menu_font_cache[key]
-
+from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT, DIFFICULTY_MULTIPLIERS
+from src.utils import get_cached_font, clear_menu_background_cache
 
 # Pre-create background gradient surface
 _bg_gradient_surface = None
@@ -28,7 +16,7 @@ def _get_menu_background():
     # Luôn tạo background với kích thước hiện tại của màn hình
     current_w = pygame.display.get_surface().get_width() if pygame.display.get_surface() else SCREEN_WIDTH
     current_h = pygame.display.get_surface().get_height() if pygame.display.get_surface() else SCREEN_HEIGHT
-    
+
     # Nếu kích thước thay đổi, tạo lại background
     if _bg_gradient_surface is None or _bg_gradient_surface.get_size() != (current_w, current_h):
         _bg_gradient_surface = pygame.Surface((current_w, current_h))
@@ -143,8 +131,7 @@ class GameSettings:
     
     def get_difficulty_multiplier(self):
         """Lấy multiplier cho độ khó"""
-        multipliers = {'easy': 0.7, 'normal': 1.0, 'hard': 1.3}
-        return multipliers.get(self.difficulty, 1.0)
+        return DIFFICULTY_MULTIPLIERS.get(self.difficulty, 1.0)
 
 # Singleton
 settings = GameSettings()
@@ -162,22 +149,27 @@ class Menu:
         available_fonts = pygame.font.get_fonts()
         title_font_name = 'impact' if 'impact' in available_fonts else 'arial'
 
-        self.font_title = _get_menu_font(title_font_name, 80)
-        self.font_item = _get_menu_font('Arial', 32, bold=True)
-        self.font_small = _get_menu_font('Arial', 20)
-        self.font_hint = _get_menu_font('Arial', 16)
+        self.font_title = get_cached_font(title_font_name, 80)
+        self.font_item = get_cached_font('Arial', 32, bold=True)
+        self.font_small = get_cached_font('Arial', 20)
+        self.font_hint = get_cached_font('Arial', 16)
 
         # Menu items - Updated: Added Solo mode
         self.main_items = ["Solo", "PVE(VS AI)", "PVP(VS PLAYER)", "Time Attack", "Endless", "Achievements", "Stats", "Train AI", "Settings", "Quit"]
         self.settings_items = ["Sound: ON", "Music: ON", "Data Collection: ON", "Difficulty: Normal", "AI Level: Medium", "Back"]
-        
+
         self.selected = 0
         self.btn_width = 350
         self.btn_height = 55
         self.btn_gap = 20
-        
+
+        # Scrolling
+        self.scroll_offset = 0
+        self.max_visible_buttons = 8  # Số button hiển thị tối đa
+        self.is_scrolling = False
+
         self.particles = [Particle() for _ in range(15)]
-        
+
         self.button_rects = []
         self._calculate_button_positions()
 
@@ -186,20 +178,41 @@ class Menu:
             items = self.main_items
         else:
             items = self.settings_items
-        
+
         # Lấy kích thước màn hình hiện tại
         current_w = self.screen.get_width()
         current_h = self.screen.get_height()
-        
+
         center_x = current_w // 2
-        total_height = len(items) * (self.btn_height + self.btn_gap)
-        start_y = (current_h - total_height) // 2 + 60
-        
+
+        # Tính toán scroll nếu có nhiều items hơn max visible
+        total_items = len(items)
+        self.is_scrolling = total_items > self.max_visible_buttons
+
+        if self.is_scrolling:
+            # Giới hạn scroll_offset
+            self.scroll_offset = max(0, min(self.scroll_offset, total_items - self.max_visible_buttons))
+            visible_items = total_items
+            start_idx = self.scroll_offset
+        else:
+            self.scroll_offset = 0
+            visible_items = total_items
+            start_idx = 0
+
+        # Tính toán vị trí bắt đầu và khoảng cách
+        total_height = self.max_visible_buttons * (self.btn_height + self.btn_gap)
+        start_y = (current_h - total_height) // 2 + 30
+
         self.button_rects = []
-        for i in range(len(items)):
+        for i in range(visible_items):
+            item_idx = start_idx + i
+            if item_idx >= total_items:
+                break
             y = start_y + i * (self.btn_height + self.btn_gap)
             rect = pygame.Rect(0, 0, self.btn_width, self.btn_height)
             rect.center = (center_x, y)
+            # Lưu index thực sự của item
+            self.button_rects.append((item_idx, rect))
             self.button_rects.append(rect)
 
     def draw_background(self):
@@ -530,8 +543,11 @@ class Menu:
         pygame.display.flip()
 
     def draw(self):
+        # Cập nhật vị trí buttons mỗi khi vẽ để thích ứng với kích thước màn hình
+        self._calculate_button_positions()
+
         self.draw_background()
-        
+
         if self.current_menu == MENU_SETTINGS:
             self.draw_settings_menu()
             return
@@ -550,10 +566,26 @@ class Menu:
 
         mouse_pos = pygame.mouse.get_pos()
 
-        for i, (item, rect) in enumerate(zip(self.main_items, self.button_rects)):
-            is_hovered = rect.collidepoint(mouse_pos)
-            if is_hovered: self.selected = i
-            self.draw_button(item, rect, i == self.selected)
+        # Vẽ buttons với hỗ trợ scroll
+        for item_idx, rect in self.button_rects:
+            if item_idx < len(self.main_items):
+                item = self.main_items[item_idx]
+                is_hovered = rect.collidepoint(mouse_pos)
+                if is_hovered:
+                    self.selected = item_idx
+                self.draw_button(item, rect, item_idx == self.selected)
+
+        # Vẽ scroll indicators nếu cần
+        if self.is_scrolling:
+            sw, sh = self._get_screen_dims()
+            # Scroll up indicator
+            if self.scroll_offset > 0:
+                up_indicator = self.font_item.render("▲", True, (150, 150, 150))
+                self.screen.blit(up_indicator, (sw // 2 - up_indicator.get_width() // 2, sh // 2 - 120))
+            # Scroll down indicator
+            if self.scroll_offset < len(self.main_items) - self.max_visible_buttons:
+                down_indicator = self.font_item.render("▼", True, (150, 150, 150))
+                self.screen.blit(down_indicator, (sw // 2 - down_indicator.get_width() // 2, sh // 2 + 100))
 
         # Version info
         sw, sh = self._get_screen_dims()
