@@ -14,6 +14,39 @@ from src.highscore import load_highscore, save_highscore
 from src.assets_loader import play_sound
 from src.data_collector import get_collector
 
+# ==================== GLOBAL CACHES ====================
+# Pre-create gradient background surface
+_endless_gradient_bg = None
+
+
+def _get_endless_bg():
+    """Cache gradient background surface."""
+    global _endless_gradient_bg
+    if _endless_gradient_bg is None:
+        _endless_gradient_bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        SKY_TOP = (100, 180, 230)
+        SKY_BOT = (255, 210, 120)
+        for y in range(SCREEN_HEIGHT):
+            t = y / SCREEN_HEIGHT
+            r = int(SKY_TOP[0] + (SKY_BOT[0] - SKY_TOP[0]) * t)
+            g = int(SKY_TOP[1] + (SKY_BOT[1] - SKY_TOP[1]) * t)
+            b = int(SKY_TOP[2] + (SKY_BOT[2] - SKY_TOP[2]) * t)
+            pygame.draw.line(_endless_gradient_bg, (r, g, b), (0, y), (SCREEN_WIDTH, y))
+    return _endless_gradient_bg
+
+
+# Font cache
+_endless_font_cache = {}
+
+
+def _get_endless_font(name, size, bold=False):
+    """Lấy font từ cache."""
+    key = (name, size, bold)
+    if key not in _endless_font_cache:
+        _endless_font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
+    return _endless_font_cache[key]
+
+
 SKY_TOP = (100, 180, 230)
 SKY_BOT = (255, 210, 120)
 GROUND_COL = (160, 120, 60)
@@ -26,13 +59,14 @@ class EndlessGame:
     def __init__(self, screen):
         self.screen = screen
         self.clock = pygame.time.Clock()
-        
-        self.font_title = pygame.font.SysFont('Arial', 60, bold=True)
-        self.font_hud = pygame.font.SysFont('Arial', 28, bold=True)
-        self.font_small = pygame.font.SysFont('Arial', 20)
-        
+
+        # Sử dụng cached fonts thay vì tạo mới
+        self.font_title = _get_endless_font('Arial', 60, bold=True)
+        self.font_hud = _get_endless_font('Arial', 28, bold=True)
+        self.font_small = _get_endless_font('Arial', 20)
+
         self.highscore = load_highscore()[0]
-        
+
         self.reset()
     
     def reset(self):
@@ -44,8 +78,16 @@ class EndlessGame:
         
         self.game_over = False
         self.start_ticks = pygame.time.get_ticks()
-        
-        self.collect_data = True
+
+        # Combo system
+        self.combo_count = 0       # số obstacle vượt liên tiếp
+        self.combo_mult = 1        # hệ số nhân điểm (1x, 2x, 3x, 4x)
+        # Milestone banner
+        self.milestone_timer = 0   # số frame còn lại của banner
+        self.milestone_text = ""
+        self.last_milestone = 0    # mốc milestone gần nhất đã hiện
+
+        self.collect_data = False  # Disabled by default to avoid lag
         self.collector = get_collector()
         self.frame_count = 0
     
@@ -58,7 +100,8 @@ class EndlessGame:
     
     def check_collision(self):
         dino_rect = self.dino.get_rect()
-        margin = 8
+        # Giảm margin từ 8 xuống 2 để tránh collision quá nhạy khi nhảy qua
+        margin = 2
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
         for obs in self.obstacles:
             if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):
@@ -70,10 +113,10 @@ class EndlessGame:
             return
         
         # Handle input
-        if keys:
-            if keys.get(pygame.K_SPACE) or keys.get(pygame.K_UP):
+        if keys is not None:
+            if keys[pygame.K_SPACE] or keys[pygame.K_UP]:
                 self.dino.jump()
-            if keys.get(pygame.K_DOWN):
+            if keys[pygame.K_DOWN]:
                 self.dino.duck(True)
         
         self.dino.update()
@@ -84,12 +127,25 @@ class EndlessGame:
             obs.update()
             if obs.x < self.dino.x and not obs.passed:
                 obs.passed = True
-                self.score += 1
+                self.combo_count += 1
+                # Combo multiplier: mỗi 10 obstacle liên tiếp tăng 1 bậc, tối đa 4x
+                self.combo_mult = min(1 + self.combo_count // 10, 4)
+                self.score += self.combo_mult
         
         self.obstacles = [o for o in self.obstacles if not o.is_off_screen()]
         if self.obstacles:
             self.last_obstacle_x = max(o.x for o in self.obstacles)
-        
+
+        # Milestone banner
+        milestone_step = 50
+        current_milestone = (self.score // milestone_step) * milestone_step
+        if current_milestone > self.last_milestone and current_milestone > 0:
+            self.last_milestone = current_milestone
+            self.milestone_text = f"{current_milestone} 🎯 PASSED!"
+            self.milestone_timer = 90  # 1.5 giây
+        if self.milestone_timer > 0:
+            self.milestone_timer -= 1
+
         # Increase speed
         self.game_speed = OBSTACLE_SPEED_MIN + (self.score // SPEED_INCREASE_INTERVAL) * SPEED_INCREASE_AMOUNT
         self.game_speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
@@ -98,8 +154,8 @@ class EndlessGame:
         if self.collect_data:
             self.frame_count += 1
             if self.frame_count % 10 == 0:
-                action = (1 if keys and (keys.get(pygame.K_SPACE) or keys.get(pygame.K_UP)) else 0,
-                         1 if keys and keys.get(pygame.K_DOWN) else 0)
+                action = (1 if keys and (keys[pygame.K_SPACE] or keys[pygame.K_UP]) else 0,
+                         1 if keys and keys[pygame.K_DOWN] else 0)
                 self.collector.record_sample(
                     self.dino, self.obstacles, self.game_speed,
                     action, source="human", score=self.score
@@ -108,20 +164,27 @@ class EndlessGame:
         if self.check_collision():
             self.game_over = True
             play_sound("gameover")
-            
-            # Save highscore
+            self.combo_count = 0
+            self.combo_mult = 1
+
+            # Lưu highscore
             if self.score > self.highscore:
                 self.highscore = self.score
                 save_highscore(human=self.score)
-    
+
+            # Lưu game session vào DB
+            try:
+                from src.database_handler import save_game_session, save_highscore_db
+                elapsed = (pygame.time.get_ticks() - self.start_ticks) // 1000
+                save_game_session('endless', 'human', self.score, game_duration=elapsed, end_reason='collision')
+                save_highscore_db('human', self.score, 'endless')
+            except Exception:
+                pass
+
     def draw_background(self):
-        for y in range(SCREEN_HEIGHT):
-            t = y / SCREEN_HEIGHT
-            r = int(SKY_TOP[0] + (SKY_BOT[0] - SKY_TOP[0]) * t)
-            g = int(SKY_TOP[1] + (SKY_BOT[1] - SKY_TOP[1]) * t)
-            b = int(SKY_TOP[2] + (SKY_BOT[2] - SKY_TOP[2]) * t)
-            pygame.draw.line(self.screen, (r, g, b), (0, y), (SCREEN_WIDTH, y))
-        
+        # Sử dụng cached gradient background
+        self.screen.blit(_get_endless_bg(), (0, 0))
+
         pygame.draw.rect(self.screen, GROUND_COL, (0, GROUND_Y, SCREEN_WIDTH, SCREEN_HEIGHT - GROUND_Y))
         pygame.draw.line(self.screen, GROUND_LINE, (0, GROUND_Y), (SCREEN_WIDTH, GROUND_Y), 3)
     
@@ -143,12 +206,36 @@ class EndlessGame:
     def _draw_hud(self):
         score_text = self.font_hud.render(f"SCORE: {self.score:05d}", True, (255, 230, 80))
         self.screen.blit(score_text, (20, 20))
-        
+
         hi_text = self.font_hud.render(f"HI: {self.highscore:05d}", True, (200, 200, 200))
-        self.screen.blit(hi_text, (SCREEN_WIDTH - 200, 20))
-        
+        self.screen.blit(hi_text, (SCREEN_WIDTH - 210, 20))
+
         mode_text = self.font_small.render("ENDLESS MODE", True, (200, 200, 200))
         self.screen.blit(mode_text, (SCREEN_WIDTH // 2 - mode_text.get_width() // 2, 20))
+
+        # Combo indicator
+        if self.combo_mult > 1:
+            combo_color = [
+                (255, 200, 50),   # 2x - vàng
+                (255, 120, 30),   # 3x - cam
+                (255, 50,  50),   # 4x - đỏ
+            ][min(self.combo_mult - 2, 2)]
+            combo_surf = self.font_hud.render(f"COMBO x{self.combo_mult}!", True, combo_color)
+            self.screen.blit(combo_surf, (20, 55))
+
+        # Milestone banner
+        if self.milestone_timer > 0:
+            fade = min(1.0, self.milestone_timer / 20)
+            a = int(255 * fade)
+            bw, bh = 400, 60
+            bx = SCREEN_WIDTH // 2 - bw // 2
+            by = SCREEN_HEIGHT // 2 - 100
+            banner = pygame.Surface((bw, bh), pygame.SRCALPHA)
+            banner.fill((0, 0, 0, int(180 * fade)))
+            self.screen.blit(banner, (bx, by))
+            pygame.draw.rect(self.screen, (255, 200, 50), (bx, by, bw, bh), 2, border_radius=8)
+            ms = self.font_hud.render(self.milestone_text, True, (255, 230, 80))
+            self.screen.blit(ms, ms.get_rect(center=(SCREEN_WIDTH // 2, by + bh // 2)))
     
     def _draw_game_over(self):
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
@@ -162,7 +249,7 @@ class EndlessGame:
         pygame.draw.rect(self.screen, (20, 20, 30), (px, py, pw, ph), border_radius=15)
         pygame.draw.rect(self.screen, (255, 80, 80), (px, py, pw, ph), 3, border_radius=15)
         
-        title = self.font_title.render("GAME OVER", True, (255, 80, 80))
+        title = self.font_title.render("GAME OVER", True, (255, 215, 0))  # Yellow/Gold
         self.screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, py + 50)))
         
         score_label = self.font_small.render("SCORE", True, (180, 180, 180))
@@ -198,6 +285,10 @@ class EndlessGame:
                         running = False
                     elif event.key == pygame.K_r and self.game_over:
                         self.reset()
+                
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_DOWN:
+                        self.dino.duck(False)
             
             self.update(keys if not self.game_over else None)
         

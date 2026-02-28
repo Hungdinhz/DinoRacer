@@ -15,6 +15,19 @@ from src.obstacle import create_obstacle
 from src.assets_loader import play_sound, load_image
 from src.data_collector import get_collector
 
+# ==================== GLOBAL CACHES ====================
+# Font cache - tránh tạo font mới mỗi lần
+_lane_font_cache = {}
+
+
+def _get_lane_font(name, size, bold=False):
+    """Lấy font từ cache cho lane game."""
+    key = (name, size, bold)
+    if key not in _lane_font_cache:
+        _lane_font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
+    return _lane_font_cache[key]
+
+
 # Chiều cao mỗi lane = nửa màn hình
 LANE_H = 250
 LANE_W = SCREEN_WIDTH
@@ -54,6 +67,9 @@ def _get_tile(size):
 
 
 class LaneCloud:
+    """Cloud với __slots__ để tối ưu memory"""
+    __slots__ = ('x', 'y', 'speed', 'w', 'h')
+
     def __init__(self, x=None):
         self.x = x if x is not None else random.randint(0, LANE_W)
         self.y = random.randint(10, 80)
@@ -97,12 +113,13 @@ class LaneGame:
 
         self.surface = pygame.Surface((LANE_W, LANE_H))
 
-        self.font_hud   = pygame.font.SysFont("Arial", 20, bold=True)
-        self.font_label = pygame.font.SysFont("Arial", 18, bold=True)
-        self.font_go    = pygame.font.SysFont(
+        # Sử dụng cached fonts thay vì tạo mới
+        self.font_hud   = _get_lane_font("Arial", 20, bold=True)
+        self.font_label = _get_lane_font("Arial", 18, bold=True)
+        self.font_go    = _get_lane_font(
             "impact" if "impact" in pygame.font.get_fonts() else "arial",
             42, bold=True)
-        self.font_small = pygame.font.SysFont("Arial", 16)
+        self.font_small = _get_lane_font("Arial", 16)
 
         self.clouds = [LaneCloud(random.randint(0, LANE_W)) for _ in range(4)]
         self.ground_offset = 0
@@ -114,8 +131,11 @@ class LaneGame:
     def reset(self):
         self.dino = Dino(x=80, folder=self.dino_folder)
         from config.settings import DINO_HEIGHT
-        self.dino.y = GROUND_Y_LANE - DINO_HEIGHT
+        # Set ground_y BEFORE setting y position
         self.dino.ground_y = GROUND_Y_LANE
+        self.dino.y = GROUND_Y_LANE - DINO_HEIGHT
+        # Debug: Invalidate cached rect
+        self.dino._cached_rect = None
 
         self.obstacles = []
         self.score = INITIAL_SCORE
@@ -131,13 +151,15 @@ class LaneGame:
         self.frame_count = 0
 
     def _update_dino_physics(self):
-        from config.settings import GRAVITY, DINO_HEIGHT
+        import config.settings as game_settings
         d = self.dino
-        ground = getattr(d, 'ground_y', GROUND_Y_LANE) - DINO_HEIGHT
+        # Sử dụng d.height thay vì DINO_HEIGHT cố định
+        ground = d.ground_y - d.height
         if d.is_jumping:
-            d.vel_y += GRAVITY
+            d.vel_y += game_settings.GRAVITY
             d.y += d.vel_y
-            if d.y >= ground:
+            # Sửa: dùng > thay vì >= để tránh landing ngay lập tức
+            if d.y > ground:
                 d.y = ground
                 d.vel_y = 0
                 d.is_jumping = False
@@ -175,7 +197,8 @@ class LaneGame:
             from config.settings import DUCK_HEIGHT_RATIO
             h = int(d.height * DUCK_HEIGHT_RATIO)
         dino_rect = pygame.Rect(d.x, d.y + (d.height - h), d.width, h)
-        margin = 6
+        # Giảm margin từ 6 xuống 2 để tránh collision quá nhạy khi nhảy qua
+        margin = 2
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
         for obs in self.obstacles:
             if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):
@@ -384,7 +407,7 @@ class LaneGame:
             go_shadow = self.font_go.render("GAME OVER", True, (80, 20, 10))
             surf.blit(go_shadow, go_shadow.get_rect(center=(LANE_W // 2 + 2, py + 42)))
 
-            go = self.font_go.render("GAME OVER", True, (220, 50, 30))
+            go = self.font_go.render("GAME OVER", True, (255, 215, 0))  # Yellow/Gold
             surf.blit(go, go.get_rect(center=(LANE_W // 2, py + 40)))
 
             score_txt = self.font_label.render(f"Diem: {self.score:05d}", True, (255, 230, 80))

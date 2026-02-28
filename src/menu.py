@@ -5,6 +5,43 @@ import pygame
 import random
 from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
 
+# ==================== GLOBAL CACHES ====================
+# Font cache - tránh tạo font mới mỗi lần
+_menu_font_cache = {}
+
+
+def _get_menu_font(name, size, bold=False):
+    """Lấy font từ cache cho menu."""
+    key = (name, size, bold)
+    if key not in _menu_font_cache:
+        _menu_font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
+    return _menu_font_cache[key]
+
+
+# Pre-create background gradient surface
+_bg_gradient_surface = None
+
+
+def _get_menu_background():
+    """Cache gradient background cho menu."""
+    global _bg_gradient_surface
+    if _bg_gradient_surface is None:
+        _bg_gradient_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+        # Draw gradient
+        SKY_COLOR_TOP = (60, 30, 70)
+        SKY_COLOR_BOTTOM = (200, 100, 50)
+
+        for y in range(SCREEN_HEIGHT):
+            t = y / SCREEN_HEIGHT
+            r = int(SKY_COLOR_TOP[0] + (SKY_COLOR_BOTTOM[0] - SKY_COLOR_TOP[0]) * t)
+            g = int(SKY_COLOR_TOP[1] + (SKY_COLOR_BOTTOM[1] - SKY_COLOR_TOP[1]) * t)
+            b = int(SKY_COLOR_TOP[2] + (SKY_COLOR_BOTTOM[2] - SKY_COLOR_TOP[2]) * t)
+            pygame.draw.line(_bg_gradient_surface, (r, g, b), (0, y), (SCREEN_WIDTH, y))
+
+    return _bg_gradient_surface
+
+
 # --- CẤU HÌNH MÀU SẮC ---
 SKY_COLOR_TOP = (60, 30, 70)
 SKY_COLOR_BOTTOM = (200, 100, 50)
@@ -23,6 +60,7 @@ MENU_MAIN = "main"
 MENU_SETTINGS = "settings"
 MENU_STATS = "stats"
 MENU_ACHIEVEMENTS = "achievements"
+MENU_TRAIN_AI = "train_ai"
 
 class Particle:
     def __init__(self):
@@ -70,12 +108,14 @@ class GameSettings:
             self.data_collection_enabled = get_setting('data_collection_enabled', 'true') == 'true'
             self.difficulty = get_setting('difficulty', 'normal')
             self.ai_difficulty = get_setting('ai_difficulty', 'medium')
+            self.skin_dino = get_setting('skin_dino', 'dino')
         except:
             self.sound_enabled = True
             self.music_enabled = True
             self.data_collection_enabled = True
             self.difficulty = 'normal'
             self.ai_difficulty = 'medium'
+            self.skin_dino = 'dino'
     
     def save_settings(self):
         """Lưu settings vào database"""
@@ -86,6 +126,7 @@ class GameSettings:
             set_setting('data_collection_enabled', 'true' if self.data_collection_enabled else 'false')
             set_setting('difficulty', self.difficulty)
             set_setting('ai_difficulty', self.ai_difficulty)
+            set_setting('skin_dino', self.skin_dino)
         except Exception as e:
             print(f"Error saving settings: {e}")
     
@@ -102,17 +143,21 @@ class Menu:
         if not pygame.font.get_init(): pygame.font.init()
         self.screen = screen
         self.current_menu = MENU_MAIN
-        
+
+        # Cache stats to avoid querying database every frame
+        self.cached_stats = None
+
+        # Sử dụng cached fonts thay vì tạo mới
         available_fonts = pygame.font.get_fonts()
         title_font_name = 'impact' if 'impact' in available_fonts else 'arial'
-        
-        self.font_title = pygame.font.SysFont(title_font_name, 80)
-        self.font_item = pygame.font.SysFont('Arial', 32, bold=True)
-        self.font_small = pygame.font.SysFont('Arial', 20)
-        self.font_hint = pygame.font.SysFont('Arial', 16)
-        
+
+        self.font_title = _get_menu_font(title_font_name, 80)
+        self.font_item = _get_menu_font('Arial', 32, bold=True)
+        self.font_small = _get_menu_font('Arial', 20)
+        self.font_hint = _get_menu_font('Arial', 16)
+
         # Menu items
-        self.main_items = ["PVE(VS AI)", "PVP(VS PLAYER)", "Time Attack", "Endless", "Stats", "Settings", "Quit"]
+        self.main_items = ["PVE(VS AI)", "PVP(VS PLAYER)", "Time Attack", "Endless", "Achievements", "Stats", "Train AI", "Settings", "Quit"]
         self.settings_items = ["Sound: ON", "Music: ON", "Data Collection: ON", "Difficulty: Normal", "AI Level: Medium", "Back"]
         
         self.selected = 0
@@ -120,7 +165,7 @@ class Menu:
         self.btn_height = 55
         self.btn_gap = 20
         
-        self.particles = [Particle() for _ in range(50)]
+        self.particles = [Particle() for _ in range(15)]
         
         self.button_rects = []
         self._calculate_button_positions()
@@ -143,16 +188,10 @@ class Menu:
             self.button_rects.append(rect)
 
     def draw_background(self):
-        pygame.draw.rect(self.screen, SKY_COLOR_TOP, (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
-        pygame.draw.rect(self.screen, SKY_COLOR_BOTTOM, (0, SCREEN_HEIGHT // 2, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
-        
-        for i in range(50):
-            alpha = 255 - (i * 5)
-            color = (*SKY_COLOR_TOP, alpha)
-            s = pygame.Surface((SCREEN_WIDTH, 1), pygame.SRCALPHA)
-            s.fill(color)
-            self.screen.blit(s, (0, SCREEN_HEIGHT // 2 - 25 + i))
+        # Sử dụng cached background thay vì vẽ lại mỗi frame
+        self.screen.blit(_get_menu_background(), (0, 0))
 
+        # Chỉ update và vẽ particles
         for p in self.particles:
             p.update()
             p.draw(self.screen)
@@ -189,13 +228,18 @@ class Menu:
         self.draw_background()
         self.draw_title_with_shadow("SETTINGS", 80)
         
-        # Update settings text based on current values
+        # Danh sách skin có sẵn
+        SKINS = ['dino', 'dino2', 'dino3']
+        skin_label = settings.skin_dino.upper()
+
+        # Cập nhật text
         self.settings_items = [
             f"Sound: {'ON' if settings.sound_enabled else 'OFF'}",
             f"Music: {'ON' if settings.music_enabled else 'OFF'}",
             f"Data Collection: {'ON' if settings.data_collection_enabled else 'OFF'}",
             f"Difficulty: {settings.difficulty.capitalize()}",
             f"AI Level: {settings.ai_difficulty.capitalize()}",
+            f"Skin: {skin_label}",
             "Back"
         ]
         self._calculate_button_positions()
@@ -213,50 +257,246 @@ class Menu:
         
         pygame.display.flip()
 
+    def draw_achievements_menu(self):
+        """Hiển thị danh sách thành tựu"""
+        from src.achievements import get_achievements
+        self.draw_background()
+        self.draw_title_with_shadow("ACHIEVEMENTS", 60)
+
+        ach_obj = get_achievements()
+        all_ach = ach_obj.get_all_achievements()
+        unlocked_count = ach_obj.get_unlocked_count()
+        total_count = ach_obj.get_total_count()
+
+        # Tiêu đề phụ
+        sub = self.font_small.render(
+            f"Mở khóa: {unlocked_count} / {total_count}",
+            True, (200, 200, 200)
+        )
+        self.screen.blit(sub, (SCREEN_WIDTH // 2 - sub.get_width() // 2, 110))
+
+        # Vẽ grid (3 cột)
+        cols = 3
+        cell_w = 300
+        cell_h = 70
+        gap_x = 20
+        gap_y = 12
+        total_w = cols * cell_w + (cols - 1) * gap_x
+        start_x = SCREEN_WIDTH // 2 - total_w // 2
+        start_y = 145
+
+        for idx, ach in enumerate(all_ach):
+            col = idx % cols
+            row = idx // cols
+            cx = start_x + col * (cell_w + gap_x)
+            cy = start_y + row * (cell_h + gap_y)
+
+            # Dừng khi ra ngoài màn hình
+            if cy + cell_h > SCREEN_HEIGHT - 50:
+                break
+
+            if ach['unlocked']:
+                bg_col = (40, 60, 40, 200)
+                border_col = (100, 200, 100)
+                text_col = (255, 255, 255)
+                icon_col = (255, 230, 80)
+            else:
+                bg_col = (30, 30, 40, 180)
+                border_col = (80, 80, 100)
+                text_col = (120, 120, 140)
+                icon_col = (80, 80, 100)
+
+            cell = pygame.Surface((cell_w, cell_h), pygame.SRCALPHA)
+            cell.fill(bg_col)
+            self.screen.blit(cell, (cx, cy))
+            pygame.draw.rect(self.screen, border_col, (cx, cy, cell_w, cell_h), 1, border_radius=6)
+
+            icon_surf = self.font_item.render(ach['icon'] if ach['unlocked'] else '🔒', True, icon_col)
+            self.screen.blit(icon_surf, (cx + 8, cy + cell_h // 2 - icon_surf.get_height() // 2))
+
+            name_surf = self.font_small.render(ach['name'], True, text_col)
+            self.screen.blit(name_surf, (cx + 50, cy + 8))
+
+            desc_surf = self.font_hint.render(ach['description'], True, text_col)
+            self.screen.blit(desc_surf, (cx + 50, cy + 34))
+
+        # Nút back
+        back_rect = pygame.Rect(0, 0, 150, 45)
+        back_rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 35)
+        self.draw_button("← BACK", back_rect, self.selected == 0)
+        self.button_rects = [back_rect]
+
+        pygame.display.flip()
+
+    def draw_train_ai_menu(self):
+        """Submenu chọn loại Training AI"""
+        self.draw_background()
+        self.draw_title_with_shadow("TRAIN AI", 80)
+
+        desc_lines = [
+            "Chọn phương pháp huấn luyện AI:",
+            "",
+            "NEAT: Thuật toán tiến hóa mạng neural (không cần dữ liệu)",
+            "Supervised: Học từ dữ liệu chơi của người và AI (PVP mode)",
+        ]
+        y = 160
+        for line in desc_lines:
+            s = self.font_small.render(line, True, (200, 200, 200))
+            self.screen.blit(s, (SCREEN_WIDTH // 2 - s.get_width() // 2, y))
+            y += 28
+
+        items = ["NEAT Training", "Supervised Training", "Back"]
+        btn_w, btn_h, gap = 320, 55, 18
+        total_h = len(items) * (btn_h + gap)
+        start_y = SCREEN_HEIGHT // 2 + 30
+        self.button_rects = []
+        for i, item in enumerate(items):
+            rect = pygame.Rect(0, 0, btn_w, btn_h)
+            rect.center = (SCREEN_WIDTH // 2, start_y + i * (btn_h + gap))
+            self.button_rects.append(rect)
+
+        mouse_pos = pygame.mouse.get_pos()
+        for i, (item, rect) in enumerate(zip(items, self.button_rects)):
+            if rect.collidepoint(mouse_pos):
+                self.selected = i
+            self.draw_button(item, rect, i == self.selected)
+
+        pygame.display.flip()
+
     def draw_stats_menu(self):
         self.draw_background()
         self.draw_title_with_shadow("STATISTICS", 60)
-        
-        # Get stats from database
-        try:
-            from src.database_handler import get_training_data_count
-            from src.highscore import load_highscore
-            
-            human_samples = get_training_data_count("human")
-            ai_samples = get_training_data_count("ai")
-            total_samples = human_samples + ai_samples
-            
-            hs_human, hs_ai = load_highscore()
-        except:
-            total_samples = human_samples = ai_samples = 0
-            hs_human = hs_ai = 0
-        
-        # Draw stats
-        stats = [
-            f"Training Data: {total_samples} samples",
-            f"  - From Human: {human_samples}",
-            f"  - From AI: {ai_samples}",
-            "",
-            f"High Score (Human): {hs_human}",
-            f"High Score (AI): {hs_ai}",
+
+        # Chỉ fetch khi vào menu
+        if self.cached_stats is None:
+            stats = {}
+            try:
+                from src.database_handler import get_training_data_count, get_connection
+                from src.highscore import load_highscore
+                stats['human_samples'] = get_training_data_count('human')
+                stats['ai_samples']    = get_training_data_count('ai')
+                hs_human, hs_ai = load_highscore()
+                stats['hs_human'] = hs_human
+                stats['hs_ai']    = hs_ai
+                # Lấy data sessions từ DB
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT game_mode, COUNT(*) as total, AVG(score) as avg_score, MAX(score) as top_score
+                    FROM game_sessions
+                    GROUP BY game_mode
+                    ORDER BY total DESC
+                """)
+                stats['sessions'] = cursor.fetchall()
+                cursor.execute("SELECT COUNT(*) FROM game_sessions")
+                stats['total_games'] = cursor.fetchone()[0]
+                cursor.close(); conn.close()
+            except Exception as e:
+                stats.setdefault('human_samples', 0)
+                stats.setdefault('ai_samples', 0)
+                stats.setdefault('hs_human', 0)
+                stats.setdefault('hs_ai', 0)
+                stats.setdefault('sessions', [])
+                stats.setdefault('total_games', 0)
+            self.cached_stats = stats
+
+        s = self.cached_stats
+        font_h = self.font_small   # header
+        font_v = self.font_small   # value
+
+        # ── Panel 1: Training Data ──
+        p1x, py, pw, ph = 50, 130, 280, 170
+        panel1 = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        panel1.fill((10, 20, 40, 200))
+        self.screen.blit(panel1, (p1x, py))
+        pygame.draw.rect(self.screen, (100, 150, 255), (p1x, py, pw, ph), 1, border_radius=8)
+
+        h1 = self.font_small.render("📊 TRAINING DATA", True, (150, 200, 255))
+        self.screen.blit(h1, (p1x + 10, py + 8))
+        pygame.draw.line(self.screen, (80, 100, 180), (p1x + 10, py + 30), (p1x + pw - 10, py + 30))
+        rows1 = [
+            ("Human mẫu:", f"{s['human_samples']:,}"),
+            ("AI mẫu:",     f"{s['ai_samples']:,}"),
+            ("Tổng:",       f"{s['human_samples'] + s['ai_samples']:,}"),
         ]
-        
-        y_offset = 180
-        for stat in stats:
-            surf = self.font_small.render(stat, True, BTN_TEXT_COLOR)
-            rect = surf.get_rect(center=(SCREEN_WIDTH // 2, y_offset))
-            self.screen.blit(surf, rect)
-            y_offset += 35
-        
+        for i, (k, v) in enumerate(rows1):
+            ks = font_h.render(k, True, (180, 180, 200))
+            vs = font_v.render(v, True, (255, 230, 80))
+            self.screen.blit(ks, (p1x + 10, py + 40 + i * 38))
+            self.screen.blit(vs, (p1x + pw - 10 - vs.get_width(), py + 40 + i * 38))
+
+        # ── Panel 2: Highscores ──
+        p2x = SCREEN_WIDTH // 2 - 130
+        panel2 = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        panel2.fill((10, 30, 20, 200))
+        self.screen.blit(panel2, (p2x, py))
+        pygame.draw.rect(self.screen, (80, 200, 100), (p2x, py, pw, ph), 1, border_radius=8)
+
+        h2 = self.font_small.render("🏆 HIGH SCORES", True, (150, 255, 180))
+        self.screen.blit(h2, (p2x + 10, py + 8))
+        pygame.draw.line(self.screen, (60, 160, 80), (p2x + 10, py + 30), (p2x + pw - 10, py + 30))
+        rows2 = [
+            ("Human:",  f"{s['hs_human']:,}"),
+            ("AI:",     f"{s['hs_ai']:,}"),
+            ("Best:",   f"{max(s['hs_human'], s['hs_ai']):,}"),
+        ]
+        for i, (k, v) in enumerate(rows2):
+            ks = font_h.render(k, True, (180, 200, 180))
+            vs = font_v.render(v, True, (255, 230, 80))
+            self.screen.blit(ks, (p2x + 10, py + 40 + i * 38))
+            self.screen.blit(vs, (p2x + pw - 10 - vs.get_width(), py + 40 + i * 38))
+
+        # ── Panel 3: Sessions ──
+        p3x = SCREEN_WIDTH - pw - 50
+        panel3 = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        panel3.fill((30, 15, 40, 200))
+        self.screen.blit(panel3, (p3x, py))
+        pygame.draw.rect(self.screen, (200, 100, 255), (p3x, py, pw, ph), 1, border_radius=8)
+
+        h3 = self.font_small.render(f"🎮 SESSIONS ({s['total_games']})", True, (210, 160, 255))
+        self.screen.blit(h3, (p3x + 10, py + 8))
+        pygame.draw.line(self.screen, (150, 80, 200), (p3x + 10, py + 30), (p3x + pw - 10, py + 30))
+        sessions = s.get('sessions', [])
+        if sessions:
+            for i, row in enumerate(sessions[:3]):
+                mode_v = str(row[0]).upper()
+                total_v = str(row[1])
+                avg_v = f"{float(row[2]):.1f}"
+                label = font_h.render(f"{mode_v}: {total_v} ván  avg {avg_v}", True, (200, 180, 220))
+                self.screen.blit(label, (p3x + 10, py + 40 + i * 38))
+        else:
+            no_data = font_h.render("Chưa có dữ liệu", True, (140, 120, 160))
+            self.screen.blit(no_data, (p3x + 10, py + 60))
+
+        # ── Bảng top scores theo mode ──
+        table_y = 325
+        th = self.font_hint.render("── Top Sessions theo Mode ──", True, (180, 180, 200))
+        self.screen.blit(th, (SCREEN_WIDTH // 2 - th.get_width() // 2, table_y))
+
+        col_labels = ["Mode", "Ván", "Avg Score", "Best"]
+        col_xs = [120, 320, 500, 680]
+        for ci, (lbl, cx) in enumerate(zip(col_labels, col_xs)):
+            ls = self.font_hint.render(lbl, True, (200, 200, 255))
+            self.screen.blit(ls, (cx, table_y + 22))
+
+        for ri, row in enumerate(sessions[:5]):
+            ry = table_y + 44 + ri * 26
+            vals = [str(row[0]), str(row[1]), f"{float(row[2]):.0f}", str(row[3])]
+            bg_col = (25, 25, 45, 180) if ri % 2 == 0 else (35, 35, 60, 180)
+            bg = pygame.Surface((SCREEN_WIDTH - 200, 24), pygame.SRCALPHA)
+            bg.fill(bg_col)
+            self.screen.blit(bg, (100, ry))
+            for ci, (v, cx) in enumerate(zip(vals, col_xs)):
+                c = (255, 230, 80) if ci == 3 else (220, 220, 240)
+                vs = self.font_hint.render(v, True, c)
+                self.screen.blit(vs, (cx, ry + 2))
+
         # Back button
-        back_rect = pygame.Rect(0, 0, 150, 45)
-        back_rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 80)
-        self.draw_button("Back", back_rect, self.selected == 0)
+        back_rect = pygame.Rect(0, 0, 150, 42)
+        back_rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)
+        self.draw_button("← BACK", back_rect, self.selected == 0)
         self.button_rects = [back_rect]
-        
-        hint = self.font_hint.render("Press ENTER or Click to go back", True, (200, 200, 200))
-        self.screen.blit(hint, (SCREEN_WIDTH // 2 - hint.get_width() // 2, SCREEN_HEIGHT - 30))
-        
+
         pygame.display.flip()
 
     def draw(self):
@@ -268,7 +508,13 @@ class Menu:
         elif self.current_menu == MENU_STATS:
             self.draw_stats_menu()
             return
-        
+        elif self.current_menu == MENU_ACHIEVEMENTS:
+            self.draw_achievements_menu()
+            return
+        elif self.current_menu == MENU_TRAIN_AI:
+            self.draw_train_ai_menu()
+            return
+
         # Main menu
         self.draw_title_with_shadow("DINO RACER", 100)
 
@@ -304,22 +550,23 @@ class Menu:
             1: ('music_enabled', lambda s: not s.music_enabled),
             2: ('data_collection_enabled', lambda s: not s.data_collection_enabled),
         }
-        
+
         cycles = {
             3: ('difficulty', ['easy', 'normal', 'hard']),
             4: ('ai_difficulty', ['easy', 'medium', 'hard']),
+            5: ('skin_dino', ['dino', 'dino2', 'dino3']),
         }
-        
+
         if index in toggles:
             key, toggle_func = toggles[index]
             setattr(settings, key, toggle_func(settings))
         elif index in cycles:
             key, values = cycles[index]
             current = getattr(settings, key)
-            idx = values.index(current) if current in values else 1
+            idx = values.index(current) if current in values else 0
             next_idx = (idx + 1) % len(values)
             setattr(settings, key, values[next_idx])
-        
+
         settings.save_settings()
 
     def run(self):
@@ -361,6 +608,45 @@ class Menu:
                                 self.selected = 0
                     continue
                 
+                if self.current_menu == MENU_ACHIEVEMENTS:
+                    if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
+                        self.current_menu = MENU_MAIN
+                        self.selected = 0
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        mouse_pos = pygame.mouse.get_pos()
+                        for rect in self.button_rects:
+                            if rect.collidepoint(mouse_pos):
+                                self.current_menu = MENU_MAIN
+                                self.selected = 0
+                    continue
+
+                if self.current_menu == MENU_TRAIN_AI:
+                    train_items = ["NEAT Training", "Supervised Training", "Back"]
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        mouse_pos = pygame.mouse.get_pos()
+                        for i, rect in enumerate(self.button_rects):
+                            if rect.collidepoint(mouse_pos):
+                                if train_items[i] == "Back":
+                                    self.current_menu = MENU_MAIN
+                                    self.selected = 0
+                                else:
+                                    return train_items[i]
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            self.current_menu = MENU_MAIN
+                            self.selected = 0
+                        elif event.key == pygame.K_RETURN:
+                            if self.selected < len(train_items) - 1:
+                                return train_items[self.selected]
+                            else:
+                                self.current_menu = MENU_MAIN
+                                self.selected = 0
+                        elif event.key == pygame.K_UP:
+                            self.selected = (self.selected - 1) % len(train_items)
+                        elif event.key == pygame.K_DOWN:
+                            self.selected = (self.selected + 1) % len(train_items)
+                    continue
+
                 # Main menu handling
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:
@@ -374,6 +660,13 @@ class Menu:
                                     self._calculate_button_positions()
                                 elif choice == "Stats":
                                     self.current_menu = MENU_STATS
+                                    self.selected = 0
+                                    self.cached_stats = None
+                                elif choice == "Achievements":
+                                    self.current_menu = MENU_ACHIEVEMENTS
+                                    self.selected = 0
+                                elif choice == "Train AI":
+                                    self.current_menu = MENU_TRAIN_AI
                                     self.selected = 0
                                 else:
                                     return choice
@@ -391,6 +684,13 @@ class Menu:
                             self._calculate_button_positions()
                         elif choice == "Stats":
                             self.current_menu = MENU_STATS
+                            self.selected = 0
+                            self.cached_stats = None
+                        elif choice == "Achievements":
+                            self.current_menu = MENU_ACHIEVEMENTS
+                            self.selected = 0
+                        elif choice == "Train AI":
+                            self.current_menu = MENU_TRAIN_AI
                             self.selected = 0
                         else:
                             return choice

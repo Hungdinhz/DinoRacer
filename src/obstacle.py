@@ -16,12 +16,17 @@ from config.settings import (
 _BIRD_ANIM_FRAMES = {"move": 6, "idle": 3}
 _BIRD_ANIM_SPEED  = 6   # game-frames mỗi sprite-frame
 
+# Enhanced cactus cache với LRU
 _cactus_cache = {}
+_CACTUS_CACHE_MAX_SIZE = 10
 
 
 def _get_cactus_sprite(w, h):
     key = (w, h)
     if key not in _cactus_cache:
+        # Xóa cache cũ nếu quá lớn
+        if len(_cactus_cache) >= _CACTUS_CACHE_MAX_SIZE:
+            _cactus_cache.clear()
         img = load_image("tiles/Tile_02.png", (w, h))
         if img is None:
             img = load_image("tiles/Tile_03.png", (w, h))
@@ -30,6 +35,9 @@ def _get_cactus_sprite(w, h):
 
 
 class Obstacle:
+    """Base class với __slots__ để tối ưu memory"""
+    __slots__ = ('x', 'speed', 'passed')
+
     def __init__(self, x, speed):
         self.x = x
         self.speed = speed
@@ -49,6 +57,9 @@ class Obstacle:
 
 
 class Cactus(Obstacle):
+    """Cactus với __slots__"""
+    __slots__ = ('is_large', 'width', 'height', 'y')
+
     def __init__(self, x, speed):
         super().__init__(x, speed)
         self.is_large = random.choice([True, False])
@@ -76,7 +87,9 @@ class Cactus(Obstacle):
 
 
 class Bird(Obstacle):
-    """Chim dùng sprite sheet ai_dino/move.png để tạo animation vỗ cánh."""
+    """Chim với animation và __slots__"""
+    __slots__ = ('width', 'height', 'y', 'anim_frame', 'anim_timer', '_anim')
+
     HEIGHTS = [GROUND_Y - 130, GROUND_Y - 85, GROUND_Y - 50]
 
     def __init__(self, x, speed):

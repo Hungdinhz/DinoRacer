@@ -61,16 +61,41 @@ def main():
             from src.endless import run_endless
             run_endless(screen)
             
-        elif choice == 'Train AI':
-            print("Bắt đầu training NEAT... (Nhấn Ctrl+C để dừng sớm)")
-            winner = run_neat_training(generations=20)
-            if winner:
-                print("\nTraining xong! Chạy AI tốt nhất...")
-                config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                                    neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                                    get_config_path())
-                run_best_genome_display(winner, config)
-        
+        elif choice == 'NEAT Training' or choice == 'Train AI':
+            print("Bắt đầu NEAT Visual Training... (ESC để dừng, S để skip gen)")
+            try:
+                from src.neat_visual import run_neat_visual
+                winner, config = run_neat_visual(screen, get_config_path(), generations=50)
+                if winner:
+                    from src.ai_handler import save_genome
+                    save_genome(winner)
+                    print("\nTraining xong! Chạy AI tốt nhất...")
+                    run_best_genome_display(winner, config)
+            except Exception as e:
+                print(f"Lỗi Visual Training: {e}")
+                # Fallback về silent training
+                winner = run_neat_training(generations=20)
+                if winner:
+                    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                        neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                        get_config_path())
+                    run_best_genome_display(winner, config)
+
+        elif choice == 'Supervised Training':
+            print("Bắt đầu Supervised Learning training...")
+            try:
+                from src.supervised_trainer import train_supervised, get_data_stats
+                stats = get_data_stats()
+                print(f"Dữ liệu hiện có: {stats['total']} mẫu (Human: {stats['human']}, AI: {stats['ai']})")
+                if stats['total'] < 10:
+                    print("Chưa đủ dữ liệu! Hãy chơi PVP mode để thu thập dữ liệu trước.")
+                else:
+                    success = train_supervised()
+                    if success:
+                        print("Training Supervised hoàn tất! Models đã lưu.")
+            except Exception as e:
+                print(f"Lỗi Supervised Training: {e}")
+
         elif choice == 'Quit':
             # 3. Chỉ thoát Pygame khi người dùng chọn Quit từ Menu
             break

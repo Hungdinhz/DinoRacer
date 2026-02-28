@@ -12,11 +12,9 @@ from config.settings import (
 from src.dino import Dino
 from src.obstacle import create_obstacle
 from src.highscore import load_highscore, save_highscore
-
-from src.assets_loader import play_sound, CLOUD_POSITIONS
-#from src.ui import UILayer
-
-from src.assets_loader import play_sound, load_image
+from src.assets_loader import play_sound, load_image, CLOUD_POSITIONS
+from src.achievements import check_achievements
+from src.menu import settings as game_settings
 
 SKY_TOP     = (100, 180, 230)
 SKY_BOT     = (255, 210, 120)
@@ -25,11 +23,63 @@ GROUND_LINE = (120, 85, 35)
 CLOUD_COL   = (255, 255, 255)
 TEXT_LIGHT  = (255, 255, 255)
 GO_BORDER   = (255, 200, 50)
-GO_RED      = (220, 50,  30)
+GO_RED      = (255, 215, 0)  # Gold/Yellow for GAME OVER
 GO_GREEN    = (80,  200, 80)
 
 
+# ==================== GLOBAL CACHES ====================
+# Font cache - tránh tạo font mới mỗi lần
+_font_cache = {}
+
+
+def _get_cached_font(name, size, bold=False):
+    """Lấy font từ cache, tạo mới nếu chưa có."""
+    key = (name, size, bold)
+    if key not in _font_cache:
+        _font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
+    return _font_cache[key]
+
+
+# Gradient background cache
+_gradient_cache = {}
+
+
+def _get_gradient_bg(bg_index):
+    """Cache gradient background cho mỗi bg_index."""
+    if bg_index not in _gradient_cache:
+        surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        for y in range(SCREEN_HEIGHT):
+            t = y / SCREEN_HEIGHT
+            r = int(SKY_TOP[0] + (SKY_BOT[0] - SKY_TOP[0]) * t)
+            g = int(SKY_TOP[1] + (SKY_BOT[1] - SKY_TOP[1]) * t)
+            b = int(SKY_TOP[2] + (SKY_BOT[2] - SKY_TOP[2]) * t)
+            pygame.draw.line(surf, (r, g, b), (0, y), (SCREEN_WIDTH, y))
+        _gradient_cache[bg_index] = surf
+    return _gradient_cache[bg_index]
+
+
+# Tile cache
+_tile_cache = {}
+
+
+def _get_cached_tile(name, size):
+    """Cache ground tiles."""
+    key = (name, size)
+    if key not in _tile_cache:
+        _tile_cache[key] = load_image(f"tiles/{name}", size)
+    return _tile_cache[key]
+
+
+# ==================== PARTICLE OPTIMIZATION ====================
+# Pre-allocate particle colors
+_PARTICLE_COLORS = [
+    (255, 80, 30), (255, 180, 0), (255, 230, 80), (200, 50, 20)
+]
+
+
 class Particle:
+    __slots__ = ('x', 'y', 'vx', 'vy', 'life', 'max_life', 'size', 'color')
+
     def __init__(self, x, y):
         angle = random.uniform(0, 2 * math.pi)
         speed = random.uniform(2, 8)
@@ -39,9 +89,7 @@ class Particle:
         self.life = random.randint(20, 45)
         self.max_life = self.life
         self.size = random.randint(4, 10)
-        self.color = random.choice([
-            (255, 80, 30), (255, 180, 0), (255, 230, 80), (200, 50, 20)
-        ])
+        self.color = random.choice(_PARTICLE_COLORS)
 
     def update(self):
         self.x += self.vx
@@ -51,13 +99,18 @@ class Particle:
 
     def draw(self, screen):
         alpha = int(255 * self.life / self.max_life)
+        if alpha <= 0:
+            return
         r, g, b = self.color
+        # Reuse surface if possible - create small surface only when needed
         s = pygame.Surface((self.size * 2, self.size * 2), pygame.SRCALPHA)
         pygame.draw.circle(s, (r, g, b, alpha), (self.size, self.size), self.size)
         screen.blit(s, (int(self.x) - self.size, int(self.y) - self.size))
 
 
 class Cloud:
+    __slots__ = ('x', 'y', 'speed', 'w', 'h')
+
     def __init__(self, x=None, y=None):
         self.x = x if x is not None else random.randint(SCREEN_WIDTH, SCREEN_WIDTH + 400)
         self.y = y if y is not None else random.randint(20, 150)
@@ -83,33 +136,39 @@ class Cloud:
                              self.w // 2, self.h * 4 // 5))
 
 
+# Background cache - sử dụng assets_loader hoặc fallback gradient
 _bg_cache = {}
-_tile_cache = {}
 
 
 def _get_bg(bg_index):
     if bg_index not in _bg_cache:
         img = load_image(f"background/bg{bg_index}.png", (SCREEN_WIDTH, SCREEN_HEIGHT))
         if img is None:
-            surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-            for y in range(SCREEN_HEIGHT):
-                t = y / SCREEN_HEIGHT
-                r = int(SKY_TOP[0] + (SKY_BOT[0] - SKY_TOP[0]) * t)
-                g = int(SKY_TOP[1] + (SKY_BOT[1] - SKY_TOP[1]) * t)
-                b = int(SKY_TOP[2] + (SKY_BOT[2] - SKY_TOP[2]) * t)
-                pygame.draw.line(surf, (r, g, b), (0, y), (SCREEN_WIDTH, y))
-            img = surf
+            img = _get_gradient_bg(bg_index)
         _bg_cache[bg_index] = img
     return _bg_cache[bg_index]
 
 
-def _get_tile(name, size):
-    key = (name, size)
-    if key not in _tile_cache:
-        _tile_cache[key] = load_image(f"tiles/{name}", size)
-    return _tile_cache[key]
+def clear_game_cache():
+    """Xóa tất cả cache - gọi khi cần reset hoặc thay đổi settings."""
+    global _bg_cache, _tile_cache
+    _bg_cache = {}
+    _tile_cache = {}
 
-# 277250c7aa951958baf8bce47f25cb47d038c48e
+
+# Pre-create HUD background surface (static - không cần tạo mỗi frame)
+_hud_bg_surface = None
+
+
+def _get_hud_bg():
+    """Lấy cached HUD background surface."""
+    global _hud_bg_surface
+    if _hud_bg_surface is None:
+        _hud_bg_surface = pygame.Surface((260, 70), pygame.SRCALPHA)
+        _hud_bg_surface.fill((0, 0, 0, 110))
+        pygame.draw.rect(_hud_bg_surface, (255, 200, 50, 160), (0, 0, 260, 70), 2, border_radius=8)
+    return _hud_bg_surface
+
 
 class GameManager:
     def __init__(self, screen, is_ai_mode=False):
@@ -118,18 +177,12 @@ class GameManager:
         self.is_ai_mode = is_ai_mode
         self.highscore_human, self.highscore_ai = load_highscore()
 
-
-        # Khoi tao UI
-        #self.ui = UILayer(screen)
-
-        avail = pygame.font.get_fonts()
-        title_font = 'impact' if 'impact' in avail else 'arial'
-        self.font_hud   = pygame.font.SysFont('Arial', 24, bold=True)
-        self.font_large = pygame.font.SysFont(title_font, 68, bold=True)
-        self.font_med   = pygame.font.SysFont('Arial', 30, bold=True)
-        self.font_small = pygame.font.SysFont('Arial', 20)
-        self.font_speed = pygame.font.SysFont('Arial', 18)
-        # 277250c7aa951958baf8bce47f25cb47d038c48e
+        # Sử dụng cached fonts thay vì tạo mới
+        self.font_hud   = _get_cached_font('Arial', 24, bold=True)
+        self.font_large = _get_cached_font('impact', 68, bold=True)
+        self.font_med   = _get_cached_font('Arial', 30, bold=True)
+        self.font_small = _get_cached_font('Arial', 20)
+        self.font_speed = _get_cached_font('Arial', 18)
 
         self.pause_btn = pygame.Rect(SCREEN_WIDTH - 70, 10, 50, 50)
         self.clouds = [
@@ -141,10 +194,15 @@ class GameManager:
         self.particles = []
         self.go_flash_timer = 0
         self.bg_index = 1
+
+        # Cache dino rect để tránh tạo mới mỗi frame
+        self._dino_rect_cache = None
+
         self.reset()
 
     def reset(self):
-        self.dino = Dino()
+        skin = getattr(game_settings, 'skin_dino', 'dino') if not self.is_ai_mode else 'ai_dino'
+        self.dino = Dino(folder=skin)
         self.obstacles = []
         self.score = INITIAL_SCORE
         self.game_speed = OBSTACLE_SPEED_MIN
@@ -156,6 +214,14 @@ class GameManager:
         self.particles = []
         self.go_flash_timer = 0
         self.bg_index = 1
+        # Achievement popup state
+        self.pending_achievements = []
+        self.ach_popup_timer = 0
+        self.ach_popup_item = None
+        self._start_ticks = pygame.time.get_ticks()
+
+        # Cache giá trị tính toán thường dùng
+        self._half_screen = SCREEN_WIDTH // 2
 
     def toggle_pause(self):
         self.paused = not self.paused
@@ -168,23 +234,32 @@ class GameManager:
             self.last_obstacle_x = obs.x
 
     def check_collision(self):
+        # Early exit nếu không có obstacle
+        if not self.obstacles:
+            return False
+
+        # Tối ưu: lấy rect một lần, tính margin một lần
         dino_rect = self.dino.get_rect()
-        margin = 8
+        # Giảm margin từ 8 xuống 2 để tránh collision quá nhạy khi nhảy qua
+        margin = 2
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
+
+        # Early exit: kiểm tra khoảng cách trước
+        dino_x = dino_rect.x
         for obs in self.obstacles:
+            # Bỏ qua obstacle ở xa
+            if obs.x > dino_x + 100:
+                continue
             if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):
                 return True
         return False
 
-
-    # def update(self, action=None, speed_mult=1.0):
-    #     """
-    #     Cập nhật game state.
-    #     action: None (human), hoặc (jump, duck, nothing) từ AI
-    #     """
-    #     if self.paused or self.game_over:
-
     def update(self, action=None, speed_mult=1.0):
+        """
+        Cập nhật game state.
+        action    : None (human), hoặc (jump, duck, nothing) từ AI
+        speed_mult: hệ số tốc độ obstacle (A=0.5, bình thường=1.0, D=1.5)
+        """
         if self.paused:
             return
         if self.game_over:
@@ -192,9 +267,9 @@ class GameManager:
             for p in self.particles:
                 p.update()
             self.go_flash_timer += 1
-#277250c7aa951958baf8bce47f25cb47d038c48e
             return
 
+        # Xử lý input AI
         if action is not None:
             jump, duck, _ = action
             if jump > 0.5:
@@ -204,16 +279,12 @@ class GameManager:
         self.dino.update()
         self.spawn_obstacle()
 
-        self.ground_offset = (self.ground_offset + self.game_speed) % 64
-        self.bg_offset = (self.bg_offset + self.game_speed * 0.15) % SCREEN_WIDTH
+        self.ground_offset = (self.ground_offset + self.game_speed * speed_mult) % 64
+        self.bg_offset = (self.bg_offset + self.game_speed * speed_mult * 0.15) % SCREEN_WIDTH
 
         prev_score = self.score
         for obs in self.obstacles:
-            # Lưu lại vị trí cũ trước khi update
             old_x = obs.x
-            obs.update()
-
-            # Tính toán lại quãng đường di chuyển thực tế với hệ số A/D
             actual_speed = obs.speed * speed_mult
             obs.x = old_x - actual_speed
             if obs.x < self.dino.x and not obs.passed:
@@ -247,6 +318,35 @@ class GameManager:
                 else:
                     self.highscore_human = self.score
                     save_highscore(human=self.score)
+            # Kiểm tra và trigger achievements
+            newly = check_achievements(score=self.score, obstacles=self.score)
+            self.pending_achievements.extend(newly)
+
+            # Lưu game session vào DB (non-blocking)
+            try:
+                from src.database_handler import save_game_session, save_highscore_db
+                elapsed_ms = pygame.time.get_ticks() - getattr(self, '_start_ticks', pygame.time.get_ticks())
+                game_mode = 'ai_pve' if self.is_ai_mode else 'human'
+                player_type = 'ai' if self.is_ai_mode else 'human'
+                save_game_session(
+                    game_mode=game_mode,
+                    player_type=player_type,
+                    score=self.score,
+                    game_duration=elapsed_ms // 1000,
+                    end_reason='collision'
+                )
+                save_highscore_db(player_type, self.score, game_mode)
+            except Exception:
+                pass  # DB không có thì bỏ qua
+
+        # Tiến trình hiển thị achievement popup
+        if self.ach_popup_item is None and self.pending_achievements:
+            self.ach_popup_item = self.pending_achievements.pop(0)
+            self.ach_popup_timer = 180  # hiện 3 giây (60fps x 3)
+        if self.ach_popup_timer > 0:
+            self.ach_popup_timer -= 1
+            if self.ach_popup_timer == 0:
+                self.ach_popup_item = None
 
     def get_state(self):
         nearest = None
@@ -280,7 +380,8 @@ class GameManager:
     def _draw_ground(self):
         tile_h = SCREEN_HEIGHT - GROUND_Y
         tile_w = 64
-        tile = _get_tile("Tile_01.png", (tile_w, tile_h))
+        # Sử dụng cached tile
+        tile = _get_cached_tile("Tile_01.png", (tile_w, tile_h))
         if tile:
             offset = int(self.ground_offset) % tile_w
             for x in range(-tile_w, SCREEN_WIDTH + tile_w, tile_w):
@@ -298,20 +399,18 @@ class GameManager:
     def _draw_hud(self):
         h = max(self.highscore_ai if self.is_ai_mode else self.highscore_human, self.score)
 
-        hud = pygame.Surface((260, 70), pygame.SRCALPHA)
-        hud.fill((0, 0, 0, 110))
-        pygame.draw.rect(hud, (255, 200, 50, 160), (0, 0, 260, 70), 2, border_radius=8)
-        self.screen.blit(hud, (SCREEN_WIDTH // 2 - 130, 5))
+        # Sử dụng cached HUD background
+        self.screen.blit(_get_hud_bg(), (self._half_screen - 130, 5))
 
         score_txt = self.font_hud.render(f"SCORE  {self.score:05d}", True, (255, 230, 80))
         hi_txt    = self.font_hud.render(f"HI  {h:05d}", True, (200, 200, 200))
         spd_txt   = self.font_speed.render(f"SPD  {self.game_speed:.1f}", True, (150, 230, 150))
-        self.screen.blit(score_txt, (SCREEN_WIDTH // 2 - 118, 12))
-        self.screen.blit(hi_txt,    (SCREEN_WIDTH // 2 - 118, 38))
-        self.screen.blit(spd_txt,   (SCREEN_WIDTH // 2 + 30,  38))
+        self.screen.blit(score_txt, (self._half_screen - 118, 12))
+        self.screen.blit(hi_txt,    (self._half_screen - 118, 38))
+        self.screen.blit(spd_txt,   (self._half_screen + 30,  38))
 
         # Speed bar
-        bar_x, bar_y, bar_w, bar_h = SCREEN_WIDTH // 2 + 30, 14, 90, 10
+        bar_x, bar_y, bar_w, bar_h = self._half_screen + 30, 14, 90, 10
         ratio = (self.game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
         pygame.draw.rect(self.screen, (50, 50, 50), (bar_x, bar_y, bar_w, bar_h), border_radius=4)
         fill_w = max(1, int(bar_w * ratio))
@@ -338,75 +437,59 @@ class GameManager:
                              (self.pause_btn.left + 30, self.pause_btn.top + 11, 9, 28))
 
     def _draw_paused_overlay(self):
-        # Overlay mờ
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 150))
         self.screen.blit(overlay, (0, 0))
 
-        # Panel Pause
         pw, ph = 400, 200
         px = SCREEN_WIDTH // 2 - pw // 2
         py = SCREEN_HEIGHT // 2 - ph // 2
 
-        # Đổ bóng
         shadow_surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
         shadow_surf.fill((0, 0, 0, 60))
         self.screen.blit(shadow_surf, (px + 6, py + 6))
 
-        # Panel nền
         panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
         panel.fill((20, 20, 30, 220))
         self.screen.blit(panel, (px, py))
 
-        # Viền
         pygame.draw.rect(self.screen, (100, 150, 200), (px, py, pw, ph), 2, border_radius=12)
 
-        # Icon tạm dừng ⏸
         pause_icon = self.font_large.render("⏸", True, (255, 230, 100))
         self.screen.blit(pause_icon, pause_icon.get_rect(center=(SCREEN_WIDTH // 2, py + 55)))
 
-        # Tiêu đề PAUSED
         txt = self.font_large.render("PAUSED", True, (255, 230, 100))
         self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH // 2, py + 100)))
 
-        # Hướng dẫn
         hint = self.font_small.render("Nhấn  P  để tiếp tục", True, (180, 180, 200))
         self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, py + 145)))
 
-        # Gợi ý phím tắt
         hint2 = self.font_small.render("ESC - Menu chính", True, (120, 120, 150))
         self.screen.blit(hint2, hint2.get_rect(center=(SCREEN_WIDTH // 2, py + 170)))
 
     def _draw_game_over(self):
-        # Hiệu ứng fade-in
         fade_progress = min(1.0, self.go_flash_timer / 30)
         overlay_alpha = int(170 * fade_progress)
 
-        # Overlay mờ
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, overlay_alpha))
         self.screen.blit(overlay, (0, 0))
 
-        # Vẽ particles
         for p in self.particles:
             p.draw(self.screen)
 
-        # Panel chính
         pw, ph = 500, 280
         px = SCREEN_WIDTH // 2 - pw // 2
         py = SCREEN_HEIGHT // 2 - ph // 2 - 20
 
-        # Đổ bóng cho panel
         shadow_offset = 8
         shadow_surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
-        shadow_surf.fill((0, 0, 0, 80 * fade_progress))
+        shadow_surf.fill((0, 0, 0, int(80 * fade_progress)))
         self.screen.blit(shadow_surf, (px + shadow_offset, py + shadow_offset))
 
-        # Panel nền với viền
         panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
         panel.fill((20, 15, 10, 230))
 
-        # Viền ngoài với hiệu ứng flash
         flash = abs(math.sin(self.go_flash_timer * 0.08))
         border_col = (
             int(255 * fade_progress),
@@ -414,53 +497,36 @@ class GameManager:
             int(50 * fade_progress),
         )
 
-        # Vẽ panel chính
         self.screen.blit(panel, (px, py))
         pygame.draw.rect(self.screen, border_col, (px, py, pw, ph), 3, border_radius=14)
-
-        # Đường kẻ trang trí bên trong
         pygame.draw.rect(self.screen, (60, 50, 40), (px + 8, py + 8, pw - 16, ph - 16), 1, border_radius=10)
 
-        # ===== TIÊU ĐỀ GAME OVER =====
-        # Shadow cho text
         go_shadow = self.font_large.render("GAME OVER", True, (80, 20, 10))
         self.screen.blit(go_shadow, go_shadow.get_rect(center=(SCREEN_WIDTH // 2 + 3, py + 58 + 3)))
 
-        # Text chính với hiệu ứng thay đổi màu
-        go_color = (
-            int(220 + 35 * flash * fade_progress),
-            int(50 + 30 * flash * fade_progress),
-            int(30 + 20 * flash * fade_progress)
-        )
+        go_color = GO_RED  # Yellow/Gold color
         go_txt = self.font_large.render("GAME OVER", True, go_color)
         self.screen.blit(go_txt, go_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 58)))
 
-        # ===== THÔNG TIN ĐIỂM SỐ =====
-        # Background cho phần điểm
         score_bg_rect = pygame.Rect(px + 30, py + 95, pw - 60, 70)
         pygame.draw.rect(self.screen, (30, 25, 20, 180), score_bg_rect, border_radius=10)
         pygame.draw.rect(self.screen, (80, 70, 50), score_bg_rect, 1, border_radius=10)
 
         h = max(self.highscore_ai if self.is_ai_mode else self.highscore_human, self.score)
 
-        # Điểm hiện tại
         score_label = self.font_small.render("SCORE", True, (180, 180, 180))
         self.screen.blit(score_label, score_label.get_rect(center=(SCREEN_WIDTH // 2 - 100, py + 115)))
 
         score_value = self.font_large.render(f"{self.score:05d}", True, (255, 230, 80))
         self.screen.blit(score_value, score_value.get_rect(center=(SCREEN_WIDTH // 2 - 100, py + 145)))
 
-        # Điểm cao nhất
         hi_label = self.font_small.render("HIGH SCORE", True, (180, 180, 180))
         self.screen.blit(hi_label, hi_label.get_rect(center=(SCREEN_WIDTH // 2 + 100, py + 115)))
 
         hi_value = self.font_large.render(f"{h:05d}", True, (255, 100, 100))
         self.screen.blit(hi_value, hi_value.get_rect(center=(SCREEN_WIDTH // 2 + 100, py + 145)))
 
-        # ===== NÚT HƯỚNG DẪN =====
-        # Nút Restart
         r_box = pygame.Rect(px + 40, py + 185, 180, 45)
-        r_hover = r_box.inflate(4, 4)
         pygame.draw.rect(self.screen, (60, 120, 60, 150), r_box, border_radius=8)
         pygame.draw.rect(self.screen, (100, 200, 100), r_box, 2, border_radius=8)
 
@@ -471,7 +537,6 @@ class GameManager:
         r_hint = self.font_small.render("Phím R", True, (150, 180, 150))
         self.screen.blit(r_hint, r_hint.get_rect(center=(r_box.x + 100, r_box.bottom - 8)))
 
-        # Nút Menu
         m_box = pygame.Rect(px + pw - 220, py + 185, 180, 45)
         pygame.draw.rect(self.screen, (60, 60, 120, 150), m_box, border_radius=8)
         pygame.draw.rect(self.screen, (100, 150, 200), m_box, 2, border_radius=8)
@@ -483,6 +548,35 @@ class GameManager:
         m_hint = self.font_small.render("Phím ESC", True, (150, 150, 200))
         self.screen.blit(m_hint, m_hint.get_rect(center=(m_box.x + 100, m_box.bottom - 8)))
 
+    def _draw_achievement_popup(self):
+        """Vẽ popup thành tựu mới mở khóa - slide in từ phải sang."""
+        if self.ach_popup_item is None:
+            return
+        # Tính alpha fade-out ở cuối
+        t = self.ach_popup_timer
+        if t > 150:
+            alpha = 255
+        else:
+            alpha = int(255 * t / 150)
+
+        pw, ph = 300, 70
+        margin = 12
+        px = SCREEN_WIDTH - pw - margin
+        py = margin
+
+        panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        panel.fill((20, 20, 30, int(220 * alpha / 255)))
+        self.screen.blit(panel, (px, py))
+        pygame.draw.rect(self.screen, (255, 200, 50), (px, py, pw, ph), 2, border_radius=8)
+
+        icon = self.ach_popup_item.get('icon', '🏆')
+        name = self.ach_popup_item.get('name', 'Achievement')
+
+        header = self.font_small.render("✨ THÀNH TỰU MỚI!", True, (255, 200, 50))
+        self.screen.blit(header, (px + 8, py + 6))
+        name_surf = self.font_small.render(f"{icon} {name}", True, (255, 255, 255))
+        self.screen.blit(name_surf, (px + 8, py + 32))
+
     def draw(self):
         self._draw_background()
         for c in self.clouds:
@@ -491,66 +585,48 @@ class GameManager:
         self.dino.draw(self.screen)
         for obs in self.obstacles:
             obs.draw(self.screen)
-# <<<<<<< HEAD
-
-#         # Ve UI
-#         # Điểm số và High Score
-#         h_score = self.highscore_ai if self.is_ai_mode else self.highscore_human
-#         self.ui.draw_score(self.score, h_score)
-
-#         # Nút Pause
-#         self.ui.draw_pause_icon(self.paused)
-
-#         # Menu Pause hoặc Game Over
-#         if self.paused:
-#             self.ui.draw_pause_menu()
-#         if self.game_over:
-#             self.ui.draw_game_over()
-
-
         self._draw_hud()
         self._draw_pause_btn()
         if self.paused:
             self._draw_paused_overlay()
         elif self.game_over:
             self._draw_game_over()
-#277250c7aa951958baf8bce47f25cb47d038c48e
+        self._draw_achievement_popup()
         pygame.display.flip()
 
     def run_human_mode(self):
+        """
+        Chế độ chơi thủ công.
+        - SPACE / ↑ : nhảy
+        - ↓         : cúi (giữ phím)
+        - A         : obstacle chậm lại 50%
+        - D         : obstacle nhanh lên 150%
+        - P         : pause/resume
+        - R         : restart (khi game over)
+        - ESC       : về menu (khi game over)
+        """
         running = True
         while running:
-            # --- KIỂM TRA PHÍM GIỮ CHO A VÀ D ---
+            # --- Đọc phím giữ để tính speed_mult ---
             keys = pygame.key.get_pressed()
-            speed_mult = 1.0  # Tốc độ bình thường
-            
+            speed_mult = 1.0
             if not self.paused and not self.game_over:
                 if keys[pygame.K_a]:
-                    speed_mult = 0.5  # Bấm A: Trôi chậm lại 50%
+                    speed_mult = 0.5   # A: chậm 50%
                 elif keys[pygame.K_d]:
-                    speed_mult = 1.5  # Bấm D: Trôi nhanh lên 180%
+                    speed_mult = 1.5   # D: nhanh 150%
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+
                 if event.type == pygame.KEYDOWN:
-# <<<<<<< HEAD
-#                     # using W A S D de dieu khien dino
-#                     if event.key == pygame.K_w and not self.paused:
-#                         self.dino.jump()
-#                     if event.key == pygame.K_s and not self.paused:
-#                         self.dino.duck(True)
-#                     # if event.key == pygame.K_d and not self.paused:
-#                     #     self.toggle_pause()
-#                     # if event.key == pygame.K_a and not self.paused:
-#                     #     self.toggle_pause()
-# =======
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
                         if not self.game_over and not self.paused:
                             self.dino.jump()
                     if event.key == pygame.K_DOWN:
                         if not self.game_over and not self.paused:
                             self.dino.duck(True)
-#277250c7aa951958baf8bce47f25cb47d038c48e
                     if event.key == pygame.K_p:
                         if not self.game_over:
                             self.toggle_pause()
@@ -558,32 +634,16 @@ class GameManager:
                         self.reset()
                     if event.key == pygame.K_ESCAPE and self.game_over:
                         running = False
-                if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_DOWN or event.key == pygame.K_s:
-                        self.dino.duck(False)
-# <<<<<<< HEAD
-#                 if event.type == pygame.KEYDOWN and self.game_over and event.key == pygame.K_r:
-#                     self.reset()
-#                 # Xử lý Click chuột
-#                 if event.type == pygame.MOUSEBUTTONDOWN:
-#                     if event.button == 1: # Chuột trái
-#                         if self.paused:
-#                         # Hỏi UI xem user bấm vào nút nào
-#                             action = self.ui.handle_pause_menu_click(event.pos)
-#                             if action == "Resume": self.toggle_pause()
-#                             elif action == "Restart": self.reset()
-#                             elif action == "Quit": return 
-#                         else:
-#                             if self.ui.is_pause_button_clicked(event.pos):
-#                                 self.toggle_pause()
 
-#             self.update(speed_mult=speed_mult)
+                if event.type == pygame.KEYUP:
+                    if event.key in (pygame.K_DOWN, pygame.K_s):
+                        self.dino.duck(False)
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.pause_btn.collidepoint(event.pos) and not self.game_over:
                         self.toggle_pause()
-            self.update()
-#277250c7aa951958baf8bce47f25cb47d038c48e
+
+            self.update(speed_mult=speed_mult)
             self.draw()
             self.clock.tick(FPS)
 
@@ -620,14 +680,14 @@ class GameManager:
             self.screen.blit(div, (0, LANE_H))
             self.screen.blit(player_lane.surface, (0, LANE_H + 4))
             if ai_lane.game_over or player_lane.game_over:
-                hint = font_hint.render('R - Choi lai  |  ESC - Menu', True, (220,220,220))
-                self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH//2, LANE_H*2+4-12)))
+                hint = font_hint.render('R - Chơi lại  |  ESC - Menu', True, (220, 220, 220))
+                self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, LANE_H * 2 + 4 - 12)))
             pygame.display.flip(); self.clock.tick(FPS)
 
     def run_pvp_mode(self):
         from src.lane_game import LaneGame, LANE_H
-        p1 = LaneGame('dino',    'PLAYER 1', label_color=(255, 230, 80), collect_data=True, player_type="human")
-        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255), collect_data=True, player_type="ai")
+        p1 = LaneGame('dino',    'PLAYER 1', label_color=(255, 230, 80),   collect_data=True, player_type="human")
+        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255),  collect_data=True, player_type="ai")
         div = pygame.Surface((SCREEN_WIDTH, 4)); div.fill((255, 200, 50))
         font_res  = pygame.font.SysFont('Arial', 22, bold=True)
         font_hint = pygame.font.SysFont('Arial', 16)
@@ -655,12 +715,12 @@ class GameManager:
             self.screen.blit(div, (0, LANE_H))
             self.screen.blit(p2.surface, (0, LANE_H + 4))
             if p1.game_over and p2.game_over:
-                if p1.score > p2.score: msg,col = f'P1 THANG! ({p1.score}vs {p2.score})',(255,230,80)
-                elif p2.score > p1.score: msg,col = f'P2 THANG! ({p2.score} vs {p1.score})',(200,150,255)
-                else: msg,col = f'HOA! ({p1.score})',(200,200,200)
+                if p1.score > p2.score: msg, col = f'P1 THẮNG! ({p1.score} vs {p2.score})', (255, 230, 80)
+                elif p2.score > p1.score: msg, col = f'P2 THẮNG! ({p2.score} vs {p1.score})', (200, 150, 255)
+                else: msg, col = f'HÒA! ({p1.score})', (200, 200, 200)
                 res = font_res.render(msg, True, col)
-                self.screen.blit(res, res.get_rect(center=(SCREEN_WIDTH//2, LANE_H+2)))
+                self.screen.blit(res, res.get_rect(center=(SCREEN_WIDTH // 2, LANE_H + 2)))
             if p1.game_over or p2.game_over:
-                hint = font_hint.render('R - Choi lai  |  ESC - Menu', True, (220,220,220))
-                self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH//2, LANE_H*2+4-12)))
+                hint = font_hint.render('R - Chơi lại  |  ESC - Menu', True, (220, 220, 220))
+                self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, LANE_H * 2 + 4 - 12)))
             pygame.display.flip(); self.clock.tick(FPS)

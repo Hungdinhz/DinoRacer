@@ -13,6 +13,39 @@ from src.obstacle import create_obstacle
 from src.assets_loader import play_sound
 from src.data_collector import get_collector
 
+# ==================== GLOBAL CACHES ====================
+# Pre-create gradient background surface
+_gradient_bg_surface = None
+
+
+def _get_gradient_bg():
+    """Cache gradient background surface."""
+    global _gradient_bg_surface
+    if _gradient_bg_surface is None:
+        _gradient_bg_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        SKY_TOP = (100, 180, 230)
+        SKY_BOT = (255, 210, 120)
+        for y in range(SCREEN_HEIGHT):
+            t = y / SCREEN_HEIGHT
+            r = int(SKY_TOP[0] + (SKY_BOT[0] - SKY_TOP[0]) * t)
+            g = int(SKY_TOP[1] + (SKY_BOT[1] - SKY_TOP[1]) * t)
+            b = int(SKY_TOP[2] + (SKY_BOT[2] - SKY_TOP[2]) * t)
+            pygame.draw.line(_gradient_bg_surface, (r, g, b), (0, y), (SCREEN_WIDTH, y))
+    return _gradient_bg_surface
+
+
+# Font cache
+_time_attack_font_cache = {}
+
+
+def _get_time_attack_font(name, size, bold=False):
+    """Lấy font từ cache."""
+    key = (name, size, bold)
+    if key not in _time_attack_font_cache:
+        _time_attack_font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
+    return _time_attack_font_cache[key]
+
+
 SKY_TOP = (100, 180, 230)
 SKY_BOT = (255, 210, 120)
 GROUND_COL = (160, 120, 60)
@@ -33,11 +66,12 @@ class TimeAttackGame:
         self.clock = pygame.time.Clock()
         self.difficulty = difficulty
         self.time_limit = self.TIME_LIMITS.get(difficulty, 90)  # seconds
-        
-        self.font_title = pygame.font.SysFont('Arial', 60, bold=True)
-        self.font_hud = pygame.font.SysFont('Arial', 28, bold=True)
-        self.font_small = pygame.font.SysFont('Arial', 20)
-        
+
+        # Sử dụng cached fonts thay vì tạo mới
+        self.font_title = _get_time_attack_font('Arial', 60, bold=True)
+        self.font_hud = _get_time_attack_font('Arial', 28, bold=True)
+        self.font_small = _get_time_attack_font('Arial', 20)
+
         self.reset()
     
     def reset(self):
@@ -51,7 +85,7 @@ class TimeAttackGame:
         self.time_remaining = self.time_limit
         self.start_ticks = pygame.time.get_ticks()
         
-        self.collect_data = True  # Thu thập dữ liệu khi chơi
+        self.collect_data = False  # Disabled by default to avoid lag
         self.collector = get_collector()
         self.frame_count = 0
     
@@ -64,7 +98,8 @@ class TimeAttackGame:
     
     def check_collision(self):
         dino_rect = self.dino.get_rect()
-        margin = 8
+        # Giảm margin từ 8 xuống 2 để tránh collision quá nhạy khi nhảy qua
+        margin = 2
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
         for obs in self.obstacles:
             if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):
@@ -85,10 +120,10 @@ class TimeAttackGame:
             return
         
         # Handle input
-        if keys:
-            if keys.get(pygame.K_SPACE) or keys.get(pygame.K_UP):
+        if keys is not None:
+            if keys[pygame.K_SPACE] or keys[pygame.K_UP]:
                 self.dino.jump()
-            if keys.get(pygame.K_DOWN):
+            if keys[pygame.K_DOWN]:
                 self.dino.duck(True)
         
         self.dino.update()
@@ -113,8 +148,8 @@ class TimeAttackGame:
         if self.collect_data:
             self.frame_count += 1
             if self.frame_count % 10 == 0:
-                action = (1 if keys and (keys.get(pygame.K_SPACE) or keys.get(pygame.K_UP)) else 0,
-                         1 if keys and keys.get(pygame.K_DOWN) else 0)
+                action = (1 if keys and (keys[pygame.K_SPACE] or keys[pygame.K_UP]) else 0,
+                         1 if keys and keys[pygame.K_DOWN] else 0)
                 self.collector.record_sample(
                     self.dino, self.obstacles, self.game_speed,
                     action, source="human", score=self.score
@@ -125,14 +160,9 @@ class TimeAttackGame:
             play_sound("gameover")
     
     def draw_background(self):
-        # Gradient sky
-        for y in range(SCREEN_HEIGHT):
-            t = y / SCREEN_HEIGHT
-            r = int(SKY_TOP[0] + (SKY_BOT[0] - SKY_TOP[0]) * t)
-            g = int(SKY_TOP[1] + (SKY_BOT[1] - SKY_TOP[1]) * t)
-            b = int(SKY_TOP[2] + (SKY_BOT[2] - SKY_TOP[2]) * t)
-            pygame.draw.line(self.screen, (r, g, b), (0, y), (SCREEN_WIDTH, y))
-        
+        # Sử dụng cached gradient background
+        self.screen.blit(_get_gradient_bg(), (0, 0))
+
         # Ground
         pygame.draw.rect(self.screen, GROUND_COL, (0, GROUND_Y, SCREEN_WIDTH, SCREEN_HEIGHT - GROUND_Y))
         pygame.draw.line(self.screen, GROUND_LINE, (0, GROUND_Y), (SCREEN_WIDTH, GROUND_Y), 3)
@@ -225,6 +255,10 @@ class TimeAttackGame:
                         running = False
                     elif event.key == pygame.K_r and self.game_over:
                         self.reset()
+                
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_DOWN:
+                        self.dino.duck(False)
             
             self.update(keys if not self.game_over else None)
         
