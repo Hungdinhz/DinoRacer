@@ -33122,5 +33122,837 @@
     "action_jump": 0,
     "action_duck": 0,
     "game_speed_raw": 6.0
+  },
+  {
+    "inputs": [
+      1.0,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      1.0,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 1.0,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.96,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.96,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.96,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.96,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.82,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.82,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.82,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.82,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.68,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.68,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.68,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.68,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.54,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.54,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.54,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.54,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.4,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.4,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.4,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.4,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.26,
+      1.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "human",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.26,
+    "obstacle_type": 1.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
+  },
+  {
+    "inputs": [
+      0.26,
+      0.0,
+      0.0,
+      0.8,
+      0.0,
+      0.0
+    ],
+    "outputs": {
+      "jump": 0,
+      "duck": 0
+    },
+    "source": "ai",
+    "game_speed": 7.0,
+    "score": 0,
+    "distance_to_obstacle": 0.26,
+    "obstacle_type": 0.0,
+    "game_speed_norm": 0.0,
+    "dino_height": 0.8,
+    "is_jumping": 0.0,
+    "is_ducking": 0.0,
+    "action_jump": 0,
+    "action_duck": 0,
+    "game_speed_raw": 7.0
   }
 ]

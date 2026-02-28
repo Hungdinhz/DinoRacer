@@ -2,13 +2,21 @@
 Utils - Các hàm dùng chung cho toàn bộ game
 Font caching, background generation, và shared utilities
 """
+from __future__ import annotations
+
 import pygame
+from typing import Optional, Tuple
+
+# Type aliases
+Color = Tuple[int, int, int]
+ColorAlpha = Tuple[int, int, int, int]
+Size = Tuple[int, int]
 
 # ==================== FONT CACHE ====================
-_font_cache = {}
+_font_cache: dict[Tuple[str, int, bool], pygame.font.Font] = {}
 
 
-def get_cached_font(name, size, bold=False):
+def get_cached_font(name: str, size: int, bold: bool = False) -> pygame.font.Font:
     """Lấy font từ cache, tạo mới nếu chưa có."""
     key = (name, size, bold)
     if key not in _font_cache:
@@ -16,17 +24,23 @@ def get_cached_font(name, size, bold=False):
     return _font_cache[key]
 
 
-def clear_font_cache():
+def clear_font_cache() -> None:
     """Xóa font cache - gọi khi cần giải phóng bộ nhớ."""
     global _font_cache
     _font_cache = {}
 
 
 # ==================== BACKGROUND CACHE ====================
-_gradient_cache = {}
+_gradient_cache: dict[Tuple[int, int, int, Color, Color], pygame.Surface] = {}
 
 
-def get_gradient_bg(width, height, bg_index=0, top_color=None, bottom_color=None):
+def get_gradient_bg(
+    width: int,
+    height: int,
+    bg_index: int = 0,
+    top_color: Optional[Color] = None,
+    bottom_color: Optional[Color] = None
+) -> pygame.Surface:
     """
     Tạo/cached gradient background.
     width, height: kích thước surface
@@ -52,18 +66,18 @@ def get_gradient_bg(width, height, bg_index=0, top_color=None, bottom_color=None
     return _gradient_cache[key]
 
 
-def clear_gradient_cache():
+def clear_gradient_cache() -> None:
     """Xóa gradient cache - gọi khi resize màn hình."""
     global _gradient_cache
     _gradient_cache = {}
 
 
 # ==================== MENU BACKGROUND ====================
-_menu_bg_cache = None
-_menu_bg_size = (0, 0)
+_menu_bg_cache: Optional[pygame.Surface] = None
+_menu_bg_size: Size = (0, 0)
 
 
-def get_menu_background(screen_width, screen_height):
+def get_menu_background(screen_width: int, screen_height: int) -> pygame.Surface:
     """Tạo/cached gradient background cho menu."""
     global _menu_bg_cache, _menu_bg_size
 
@@ -84,7 +98,7 @@ def get_menu_background(screen_width, screen_height):
     return _menu_bg_cache
 
 
-def clear_menu_background_cache():
+def clear_menu_background_cache() -> None:
     """Xóa menu background cache."""
     global _menu_bg_cache, _menu_bg_size
     _menu_bg_cache = None
@@ -93,11 +107,11 @@ def clear_menu_background_cache():
 
 # ==================== SHARED CONSTANTS ====================
 # Game over colors
-GO_RED = (255, 215, 0)  # Gold/Yellow
-GO_GREEN = (80, 200, 80)
+GO_RED: Color = (255, 215, 0)  # Gold/Yellow
+GO_GREEN: Color = (80, 200, 80)
 
 # Particle colors
-PARTICLE_COLORS = [
+PARTICLE_COLORS: list[Color] = [
     (255, 80, 30), (255, 180, 0), (255, 230, 80), (200, 50, 20)
 ]
 
@@ -109,7 +123,7 @@ HUD_BG_BORDER_COLOR = (255, 200, 50)
 HUD_BG_BORDER_ALPHA = 160
 
 
-def get_hud_bg_surface():
+def get_hud_bg_surface() -> pygame.Surface:
     """Tạo cached HUD background surface."""
     surf = pygame.Surface((HUD_BG_WIDTH, HUD_BG_HEIGHT), pygame.SRCALPHA)
     surf.fill((0, 0, 0, HUD_BG_ALPHA))

@@ -54,24 +54,59 @@ def _get_inputs_from_lane(lane):
 
 
 def _get_inputs(dino, obstacles, game_speed):
+    """Cải thiện inputs cho AI - thêm nhiều features hơn"""
     nearest = None
+    second_nearest = None
     min_dist = float('inf')
+    second_dist = float('inf')
+
     for obs in obstacles:
         if obs.x > dino.x:
             dist = obs.x - dino.x
             if dist < min_dist:
+                second_dist = min_dist
+                second_nearest = nearest
                 min_dist = dist
                 nearest = obs
+            elif dist < second_dist:
+                second_dist = dist
+                second_nearest = obs
+
+    # Nếu không có obstacle
     if nearest is None:
-        return [1.0, 0.5, 0.0, 0.0, 0.0]
-    from src.obstacle import Cactus
-    return [
-        min(min_dist / 500, 1.0),
-        0.0 if isinstance(nearest, Cactus) else 1.0,
-        (game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN),
-        min((GROUND_Y - dino.y) / 100, 1.0),
-        1.0 if dino.is_jumping else 0.0,
-    ]
+        return [1.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+    from src.obstacle import Cactus, Bird
+
+    # Tính toán các inputs
+    # 1. Khoảng cách đến obstacle gần nhất (normalized)
+    dist1 = min(min_dist / 500, 1.0)
+
+    # 2. Loại obstacle gần nhất (0 = Cactus, 1 = Bird)
+    type1 = 0.0 if isinstance(nearest, Cactus) else 1.0
+
+    # 3. Chiều cao của Bird (0 = thấp, 1 = cao, 2 = rất cao)
+    if isinstance(nearest, Bird):
+        bird_height = nearest.y
+        height_ratio = (GROUND_Y - bird_height) / 130  # 130 = max height diff
+        type1 = 0.3 + height_ratio * 0.7  # Map to 0.3-1.0 range
+
+    # 4. Khoảng cách đến obstacle thứ 2
+    dist2 = min(second_dist / 500, 1.0) if second_nearest else 1.0
+
+    # 5. Tốc độ game (normalized)
+    speed_norm = (game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
+
+    # 6. Độ cao hiện tại của dino (0 = ground, 1 = cao nhất)
+    height_norm = min((GROUND_Y - dino.y) / 100, 1.0)
+
+    # 7. Đang nhảy hay không
+    is_jumping = 1.0 if dino.is_jumping else 0.0
+
+    # 8. Đang cúi hay không
+    is_ducking = 1.0 if dino.is_ducking else 0.0
+
+    return [dist1, type1, dist2, speed_norm, height_norm, is_jumping, is_ducking, 0.5]
 
 
 def eval_genome(genome, config):
@@ -116,9 +151,15 @@ def eval_genome(genome, config):
         margin = 4
         for obs in obstacles:
             if dino_rect.inflate(-margin, -margin).colliderect(obs.get_rect().inflate(-margin, -margin)):
-                return score * 10
+                # Cải thiện fitness: thưởng nhiều hơn khi sống lâu ở tốc độ cao
+                speed_bonus = (game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
+                final_fitness = score * 10 * (1 + speed_bonus)
+                return final_fitness
 
-    return score * 10
+    # Cải thiện fitness: thưởng nhiều hơn khi sống lâu ở tốc độ cao
+    speed_bonus = (game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
+    final_fitness = score * 10 * (1 + speed_bonus)
+    return final_fitness
 
 
 def eval_genomes(genomes, config):

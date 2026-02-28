@@ -3,6 +3,7 @@ Menu - Menu chính của game với các lựa chọn
 """
 import pygame
 import random
+import math
 from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT, DIFFICULTY_MULTIPLIERS
 from src.utils import get_cached_font, clear_menu_background_cache
 
@@ -108,7 +109,7 @@ class GameSettings:
             self.difficulty = get_setting('difficulty', 'normal')
             self.ai_difficulty = get_setting('ai_difficulty', 'medium')
             self.skin_dino = get_setting('skin_dino', 'dino')
-        except:
+        except Exception:
             self.sound_enabled = True
             self.music_enabled = True
             self.data_collection_enabled = True
@@ -165,8 +166,13 @@ class Menu:
 
         # Scrolling
         self.scroll_offset = 0
-        self.max_visible_buttons = 8  # Số button hiển thị tối đa
+        self.max_visible_buttons = 6  # Tăng để hiển thị nhiều button hơn
         self.is_scrolling = False
+
+        # Animation
+        self.hover_scale = 1.0  # Scale cho button được chọn
+        self.target_hover_scale = 1.0
+        self.hover_animation_speed = 0.15
 
         self.particles = [Particle() for _ in range(15)]
 
@@ -189,31 +195,29 @@ class Menu:
         total_items = len(items)
         self.is_scrolling = total_items > self.max_visible_buttons
 
+        # Giới hạn scroll_offset
         if self.is_scrolling:
-            # Giới hạn scroll_offset
             self.scroll_offset = max(0, min(self.scroll_offset, total_items - self.max_visible_buttons))
-            visible_items = total_items
-            start_idx = self.scroll_offset
         else:
             self.scroll_offset = 0
-            visible_items = total_items
-            start_idx = 0
 
-        # Tính toán vị trí bắt đầu và khoảng cách
-        total_height = self.max_visible_buttons * (self.btn_height + self.btn_gap)
+        # Tính số items hiển thị (từ scroll_offset trở đi)
+        visible_items = min(self.max_visible_buttons, total_items - self.scroll_offset)
+
+        # Tính toán vị trí bắt đầu (căn giữa)
+        total_height = visible_items * (self.btn_height + self.btn_gap)
         start_y = (current_h - total_height) // 2 + 30
 
         self.button_rects = []
         for i in range(visible_items):
-            item_idx = start_idx + i
+            item_idx = self.scroll_offset + i
             if item_idx >= total_items:
-                break
+                continue
             y = start_y + i * (self.btn_height + self.btn_gap)
             rect = pygame.Rect(0, 0, self.btn_width, self.btn_height)
             rect.center = (center_x, y)
             # Lưu index thực sự của item
             self.button_rects.append((item_idx, rect))
-            self.button_rects.append(rect)
 
     def draw_background(self):
         # Sử dụng cached background thay vì vẽ lại mỗi frame
@@ -236,23 +240,49 @@ class Menu:
         main_rect = main_surf.get_rect(center=(current_w // 2, y_pos))
         self.screen.blit(main_surf, main_rect)
 
-    def draw_button(self, text, rect, is_selected):
+    def draw_button(self, text: str, rect: pygame.Rect, is_selected: bool) -> None:
+        """Vẽ button với animation."""
+        # Animation: scale button khi được chọn
+        if is_selected:
+            self.target_hover_scale = 1.08
+        else:
+            self.target_hover_scale = 1.0
+
+        # Lerp scale
+        self.hover_scale += (self.target_hover_scale - self.hover_scale) * self.hover_animation_speed
+
+        # Tính toán rect với scale
+        if abs(self.hover_scale - 1.0) > 0.01:
+            w = int(rect.width * self.hover_scale)
+            h = int(rect.height * self.hover_scale)
+            scaled_rect = pygame.Rect(0, 0, w, h)
+            scaled_rect.center = rect.center
+            draw_rect = scaled_rect
+        else:
+            draw_rect = rect
+
         bg_color = BTN_HOVER_COLOR if is_selected else BTN_NORMAL_COLOR
-        
-        shadow_rect = rect.copy()
+
+        # Vẽ shadow
+        shadow_rect = draw_rect.copy()
         shadow_rect.x += 3
         shadow_rect.y += 3
         pygame.draw.rect(self.screen, (30, 20, 40, 150), shadow_rect, border_radius=12)
 
-        pygame.draw.rect(self.screen, bg_color, rect, border_radius=12)
-        
-        if is_selected:
-            pygame.draw.rect(self.screen, BTN_BORDER_HOVER, rect, 3, border_radius=12)
-        else:
-            pygame.draw.rect(self.screen, (50, 30, 60), rect, 2, border_radius=12)
+        # Vẽ button
+        pygame.draw.rect(self.screen, bg_color, draw_rect, border_radius=12)
 
+        # Vẽ border với hiệu ứng pulse khi selected
+        if is_selected:
+            pulse = abs(math.sin(pygame.time.get_ticks() * 0.005)) * 0.3 + 0.7
+            border_color = tuple(int(c * pulse) for c in BTN_BORDER_HOVER)
+            pygame.draw.rect(self.screen, border_color, draw_rect, 3, border_radius=12)
+        else:
+            pygame.draw.rect(self.screen, (50, 30, 60), draw_rect, 2, border_radius=12)
+
+        # Render text
         text_surf = self.font_item.render(text, True, BTN_TEXT_COLOR)
-        text_rect = text_surf.get_rect(center=rect.center)
+        text_rect = text_surf.get_rect(center=draw_rect.center)
         self.screen.blit(text_surf, text_rect)
 
     def _get_screen_dims(self):
@@ -262,7 +292,7 @@ class Menu:
     def draw_settings_menu(self):
         self.draw_background()
         self.draw_title_with_shadow("SETTINGS", 80)
-        
+
         # Danh sách skin có sẵn
         SKINS = ['dino', 'dino2', 'dino3']
         skin_label = settings.skin_dino.upper()
@@ -278,19 +308,26 @@ class Menu:
             "Back"
         ]
         self._calculate_button_positions()
-        
+
         mouse_pos = pygame.mouse.get_pos()
-        
-        for i, (item, rect) in enumerate(zip(self.settings_items, self.button_rects)):
+
+        for i, button_data in enumerate(self.button_rects):
+            # Handle tuple (item_idx, rect) or just rect
+            if isinstance(button_data, tuple):
+                item_idx, rect = button_data
+                item = self.settings_items[i] if i < len(self.settings_items) else ""
+            else:
+                rect = button_data
+                item = self.settings_items[i] if i < len(self.settings_items) else ""
             is_hovered = rect.collidepoint(mouse_pos)
             if is_hovered: self.selected = i
             self.draw_button(item, rect, i == self.selected)
-        
+
         # Draw instructions
         sw, sh = self._get_screen_dims()
         hint1 = self.font_hint.render("Left/Right arrows to toggle, Up/Down to select", True, (200, 200, 200))
         self.screen.blit(hint1, (sw // 2 - hint1.get_width() // 2, sh - 40))
-        
+
         pygame.display.flip()
 
     def draw_achievements_menu(self):
@@ -396,7 +433,9 @@ class Menu:
             self.button_rects.append(rect)
 
         mouse_pos = pygame.mouse.get_pos()
-        for i, (item, rect) in enumerate(zip(items, self.button_rects)):
+        for i, button_data in enumerate(self.button_rects):
+            rect = button_data if not isinstance(button_data, tuple) else button_data[1]
+            item = items[i] if i < len(items) else ""
             if rect.collidepoint(mouse_pos):
                 self.selected = i
             self.draw_button(item, rect, i == self.selected)
@@ -575,18 +614,6 @@ class Menu:
                     self.selected = item_idx
                 self.draw_button(item, rect, item_idx == self.selected)
 
-        # Vẽ scroll indicators nếu cần
-        if self.is_scrolling:
-            sw, sh = self._get_screen_dims()
-            # Scroll up indicator
-            if self.scroll_offset > 0:
-                up_indicator = self.font_item.render("▲", True, (150, 150, 150))
-                self.screen.blit(up_indicator, (sw // 2 - up_indicator.get_width() // 2, sh // 2 - 120))
-            # Scroll down indicator
-            if self.scroll_offset < len(self.main_items) - self.max_visible_buttons:
-                down_indicator = self.font_item.render("▼", True, (150, 150, 150))
-                self.screen.blit(down_indicator, (sw // 2 - down_indicator.get_width() // 2, sh // 2 + 100))
-
         # Version info
         sw, sh = self._get_screen_dims()
         hint = self.font_hint.render("v1.0 - Use Arrows + Enter or Mouse Click", True, (180, 180, 180))
@@ -649,7 +676,8 @@ class Menu:
                     # Also handle mouse click in settings
                     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                         mouse_pos = pygame.mouse.get_pos()
-                        for i, rect in enumerate(self.button_rects):
+                        for i, button_data in enumerate(self.button_rects):
+                            rect = button_data if not isinstance(button_data, tuple) else button_data[1]
                             if rect.collidepoint(mouse_pos):
                                 if i == len(self.settings_items) - 1:  # Back button
                                     self.current_menu = MENU_MAIN
@@ -665,19 +693,21 @@ class Menu:
                     # Also handle mouse click in stats
                     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                         mouse_pos = pygame.mouse.get_pos()
-                        for rect in self.button_rects:
+                        for button_data in self.button_rects:
+                            rect = button_data if not isinstance(button_data, tuple) else button_data[1]
                             if rect.collidepoint(mouse_pos):
                                 self.current_menu = MENU_MAIN
                                 self.selected = 0
                     continue
-                
+
                 if self.current_menu == MENU_ACHIEVEMENTS:
                     if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
                         self.current_menu = MENU_MAIN
                         self.selected = 0
                     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                         mouse_pos = pygame.mouse.get_pos()
-                        for rect in self.button_rects:
+                        for button_data in self.button_rects:
+                            rect = button_data if not isinstance(button_data, tuple) else button_data[1]
                             if rect.collidepoint(mouse_pos):
                                 self.current_menu = MENU_MAIN
                                 self.selected = 0
@@ -687,7 +717,8 @@ class Menu:
                     train_items = ["NEAT Training", "Supervised Training", "Back"]
                     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                         mouse_pos = pygame.mouse.get_pos()
-                        for i, rect in enumerate(self.button_rects):
+                        for i, button_data in enumerate(self.button_rects):
+                            rect = button_data if not isinstance(button_data, tuple) else button_data[1]
                             if rect.collidepoint(mouse_pos):
                                 if train_items[i] == "Back":
                                     self.current_menu = MENU_MAIN
@@ -714,9 +745,16 @@ class Menu:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:
                         mouse_pos = pygame.mouse.get_pos()
-                        for i, rect in enumerate(self.button_rects):
+                        for button_data in self.button_rects:
+                            # Handle both tuple (item_idx, rect) and just rect
+                            if isinstance(button_data, tuple):
+                                item_idx, rect = button_data
+                            else:
+                                rect = button_data
+                                item_idx = self.selected
                             if rect.collidepoint(mouse_pos):
-                                choice = self.main_items[i]
+                                self.selected = item_idx
+                                choice = self.main_items[item_idx]
                                 if choice == "Settings":
                                     self.current_menu = MENU_SETTINGS
                                     self.selected = 0
@@ -733,12 +771,36 @@ class Menu:
                                     self.selected = 0
                                 else:
                                     return choice
+                    # Mouse wheel scrolling
+                    elif event.button == 4:  # Scroll up
+                        self.scroll_offset = max(0, self.scroll_offset - 1)
+                        self._calculate_button_positions()
+                    elif event.button == 5:  # Scroll down
+                        self.scroll_offset = min(len(self.main_items) - self.max_visible_buttons,
+                                               self.scroll_offset + 1)
+                        self._calculate_button_positions()
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_UP:
                         self.selected = (self.selected - 1) % len(self.main_items)
+                        # Cập nhật scroll_offset để giữ selected visible
+                        if self.is_scrolling:
+                            max_scroll = len(self.main_items) - self.max_visible_buttons
+                            if self.selected < self.scroll_offset:
+                                self.scroll_offset = max(0, self.selected)
+                            elif self.selected >= self.scroll_offset + self.max_visible_buttons:
+                                self.scroll_offset = min(max_scroll, self.selected - self.max_visible_buttons + 2)
+                            self._calculate_button_positions()
                     elif event.key == pygame.K_DOWN:
                         self.selected = (self.selected + 1) % len(self.main_items)
+                        # Cập nhật scroll_offset để giữ selected visible
+                        if self.is_scrolling:
+                            max_scroll = len(self.main_items) - self.max_visible_buttons
+                            if self.selected < self.scroll_offset:
+                                self.scroll_offset = max(0, self.selected)
+                            elif self.selected >= self.scroll_offset + self.max_visible_buttons:
+                                self.scroll_offset = min(max_scroll, self.selected - self.max_visible_buttons + 2)
+                            self._calculate_button_positions()
                     elif event.key == pygame.K_RETURN:
                         choice = self.main_items[self.selected]
                         if choice == "Settings":

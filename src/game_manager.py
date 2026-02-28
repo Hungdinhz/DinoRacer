@@ -62,7 +62,7 @@ class Particle:
         self.life = random.randint(20, 45)
         self.max_life = self.life
         self.size = random.randint(4, 10)
-        self.color = random.choice(_PARTICLE_COLORS)
+        self.color = random.choice(PARTICLE_COLORS)
 
     def update(self):
         self.x += self.vx
@@ -76,6 +76,38 @@ class Particle:
             return
         r, g, b = self.color
         # Reuse surface if possible - create small surface only when needed
+        s = pygame.Surface((self.size * 2, self.size * 2), pygame.SRCALPHA)
+        pygame.draw.circle(s, (r, g, b, alpha), (self.size, self.size), self.size)
+        screen.blit(s, (int(self.x) - self.size, int(self.y) - self.size))
+
+
+class DustParticle:
+    """Bụi khi chạy trên ground - tạo cảm giác chuyển động"""
+    __slots__ = ('x', 'y', 'vx', 'vy', 'life', 'max_life', 'size', 'color')
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        # Bay ngược lại so với hướng di chuyển của dino
+        self.vx = random.uniform(-1.5, -0.5)
+        self.vy = random.uniform(-0.5, 0.5)
+        self.life = random.randint(15, 25)
+        self.max_life = self.life
+        self.size = random.randint(2, 5)
+        # Màu bụi - nâu nhạt
+        self.color = (180, 160, 130)
+
+    def update(self):
+        self.x += self.vx
+        self.y += self.vy
+        self.life -= 1
+        self.size = max(1, self.size - 0.1)
+
+    def draw(self, screen):
+        alpha = int(180 * self.life / self.max_life)
+        if alpha <= 0:
+            return
+        r, g, b = self.color
         s = pygame.Surface((self.size * 2, self.size * 2), pygame.SRCALPHA)
         pygame.draw.circle(s, (r, g, b, alpha), (self.size, self.size), self.size)
         screen.blit(s, (int(self.x) - self.size, int(self.y) - self.size))
@@ -151,7 +183,9 @@ class GameManager:
         ]
         self.ground_offset = 0
         self.bg_offset = 0
-        self.particles = []
+        self.particles = []  # Particles khi chết
+        self.dust_particles = []  # Bụi khi chạy
+        self._dust_spawn_timer = 0  # Timer để spawn bụi
         self.go_flash_timer = 0
         self.bg_index = 1
 
@@ -177,6 +211,8 @@ class GameManager:
         self.ground_offset = 0
         self.bg_offset = 0
         self.particles = []
+        self.dust_particles = []
+        self._dust_spawn_timer = 0
         self.go_flash_timer = 0
         self.bg_index = 1
         # Achievement popup state
@@ -243,6 +279,29 @@ class GameManager:
             self.dino.duck(duck > 0.5)
 
         self.dino.update(jump_held=jump_held)
+
+        # Spawn dust particles khi đang chạy trên ground
+        if not self.game_over and not self.paused:
+            if self.dino.is_on_ground and not self.dino.is_jumping:
+                self._dust_spawn_timer += 1
+                # Spawn bụi mỗi 3-5 frames tùy tốc độ
+                spawn_rate = max(3, 8 - int(self.game_speed / 3))
+                if self._dust_spawn_timer >= spawn_rate:
+                    self._dust_spawn_timer = 0
+                    # Spawn bụi ở vị trí chân dino
+                    dino_rect = self.dino.get_rect()
+                    for _ in range(2):  # Spawn 2 particles mỗi lần
+                        dust = DustParticle(
+                            dino_rect.right - 5,
+                            dino_rect.bottom - 2
+                        )
+                        self.dust_particles.append(dust)
+
+        # Update dust particles
+        self.dust_particles = [p for p in self.dust_particles if p.life > 0]
+        for p in self.dust_particles:
+            p.update()
+
         self.spawn_obstacle()
 
         self.ground_offset = (self.ground_offset + self.game_speed * speed_mult) % 64
@@ -548,6 +607,11 @@ class GameManager:
         for c in self.clouds:
             c.draw(self.screen)
         self._draw_ground()
+
+        # Vẽ dust particles TRƯỚC dino (để dino đè lên)
+        for p in self.dust_particles:
+            p.draw(self.screen)
+
         self.dino.draw(self.screen)
         for obs in self.obstacles:
             obs.draw(self.screen)
@@ -608,7 +672,7 @@ class GameManager:
                 if event.type == pygame.KEYUP:
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
                         self.dino.jump_release()
-                    if event.key in (pygame.K_DOWN, pygame.K_s):
+                    if event.key == pygame.K_DOWN or event.key == pygame.K_s:
                         self.dino.duck(False)
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -684,7 +748,7 @@ class GameManager:
                 if event.type == pygame.KEYUP:
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
                         p1.dino.jump_release()
-                    if event.key in (pygame.K_w):
+                    if event.key == pygame.K_w:
                         p2.dino.jump_release()
                     if event.key == pygame.K_DOWN: p1.dino.duck(False)
                     if event.key == pygame.K_s: p2.dino.duck(False)
