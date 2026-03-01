@@ -27,9 +27,9 @@ def _get_cactus_sprite(w, h):
         # Xóa cache cũ nếu quá lớn
         if len(_cactus_cache) >= _CACTUS_CACHE_MAX_SIZE:
             _cactus_cache.clear()
-        img = load_image("tiles/Tile_02.png", (w, h))
+        img = load_image("willow/3.png", (w, h))
         if img is None:
-            img = load_image("tiles/Tile_03.png", (w, h))
+            img = load_image("willows/1.png", (w, h))
         _cactus_cache[key] = img
     return _cactus_cache[key]
 

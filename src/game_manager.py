@@ -406,7 +406,7 @@ class GameManager:
         tile_h = SCREEN_HEIGHT - GROUND_Y
         tile_w = 64
         # Sử dụng cached tile
-        tile = _get_cached_tile("Tile_01.png", (tile_w, tile_h))
+        tile = _get_cached_tile("Tile_02.png", (tile_w, tile_h))
         if tile:
             offset = int(self.ground_offset) % tile_w
             for x in range(-tile_w, SCREEN_WIDTH + tile_w, tile_w):
