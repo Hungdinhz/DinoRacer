@@ -15,6 +15,7 @@ from src.obstacle import create_obstacle
 from src.highscore import load_highscore, save_highscore
 from src.assets_loader import play_sound, load_image, CLOUD_POSITIONS
 from src.achievements import check_achievements
+from src.ui import UILayer
 from src.menu import settings as game_settings
 from src.utils import (
     get_cached_font, get_gradient_bg, clear_gradient_cache,
@@ -188,6 +189,9 @@ class GameManager:
         self._dust_spawn_timer = 0  # Timer để spawn bụi
         self.go_flash_timer = 0
         self.bg_index = 1
+
+        # UILayer để vẽ 
+        self.ui = UILayer(screen)
 
         # Cache dino rect để tránh tạo mới mỗi frame
         self._dino_rect_cache = None
@@ -481,118 +485,7 @@ class GameManager:
             pygame.draw.rect(self.screen, TEXT_LIGHT,
                              (self.pause_btn.left + 30, self.pause_btn.top + 11, 9, 28))
 
-    def _draw_paused_overlay(self):
-        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 150))
-        self.screen.blit(overlay, (0, 0))
-
-        pw, ph = 400, 200
-        px = SCREEN_WIDTH // 2 - pw // 2
-        py = SCREEN_HEIGHT // 2 - ph // 2
-
-        shadow_surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
-        shadow_surf.fill((0, 0, 0, 60))
-        self.screen.blit(shadow_surf, (px + 6, py + 6))
-
-        panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
-        panel.fill((20, 20, 30, 220))
-        self.screen.blit(panel, (px, py))
-
-        pygame.draw.rect(self.screen, (100, 150, 200), (px, py, pw, ph), 2, border_radius=12)
-
-        pause_icon = self.font_large.render("⏸", True, (255, 230, 100))
-        self.screen.blit(pause_icon, pause_icon.get_rect(center=(SCREEN_WIDTH // 2, py + 55)))
-
-        txt = self.font_large.render("PAUSED", True, (255, 230, 100))
-        self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH // 2, py + 100)))
-
-        hint = self.font_small.render("Press  P  to Resume", True, (180, 180, 200))
-        self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, py + 145)))
-
-        hint2 = self.font_small.render("ESC - Main Menu", True, (120, 120, 150))
-        self.screen.blit(hint2, hint2.get_rect(center=(SCREEN_WIDTH // 2, py + 170)))
-
-    def _draw_game_over(self):
-        fade_progress = min(1.0, self.go_flash_timer / 30)
-        overlay_alpha = int(170 * fade_progress)
-
-        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, overlay_alpha))
-        self.screen.blit(overlay, (0, 0))
-
-        for p in self.particles:
-            p.draw(self.screen)
-
-        pw, ph = 500, 280
-        px = SCREEN_WIDTH // 2 - pw // 2
-        py = SCREEN_HEIGHT // 2 - ph // 2 - 20
-
-        shadow_offset = 8
-        shadow_surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
-        shadow_surf.fill((0, 0, 0, int(80 * fade_progress)))
-        self.screen.blit(shadow_surf, (px + shadow_offset, py + shadow_offset))
-
-        panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
-        panel.fill((20, 15, 10, 230))
-
-        flash = abs(math.sin(self.go_flash_timer * 0.08))
-        border_col = (
-            int(255 * fade_progress),
-            int(200 * fade_progress),
-            int(50 * fade_progress),
-        )
-
-        self.screen.blit(panel, (px, py))
-        pygame.draw.rect(self.screen, border_col, (px, py, pw, ph), 3, border_radius=14)
-        pygame.draw.rect(self.screen, (60, 50, 40), (px + 8, py + 8, pw - 16, ph - 16), 1, border_radius=10)
-
-        go_shadow = self.font_large.render("GAME OVER", True, (80, 20, 10))
-        self.screen.blit(go_shadow, go_shadow.get_rect(center=(SCREEN_WIDTH // 2 + 3, py + 58 + 3)))
-
-        go_color = GO_RED  # Yellow/Gold color
-        go_txt = self.font_large.render("GAME OVER", True, go_color)
-        self.screen.blit(go_txt, go_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 58)))
-
-        score_bg_rect = pygame.Rect(px + 30, py + 95, pw - 60, 70)
-        pygame.draw.rect(self.screen, (30, 25, 20, 180), score_bg_rect, border_radius=10)
-        pygame.draw.rect(self.screen, (80, 70, 50), score_bg_rect, 1, border_radius=10)
-
-        h = max(self.highscore_ai if self.is_ai_mode else self.highscore_human, self.score)
-
-        score_label = self.font_small.render("SCORE", True, (180, 180, 180))
-        self.screen.blit(score_label, score_label.get_rect(center=(SCREEN_WIDTH // 2 - 100, py + 115)))
-
-        score_value = self.font_large.render(f"{self.score:05d}", True, (255, 230, 80))
-        self.screen.blit(score_value, score_value.get_rect(center=(SCREEN_WIDTH // 2 - 100, py + 145)))
-
-        hi_label = self.font_small.render("HIGH SCORE", True, (180, 180, 180))
-        self.screen.blit(hi_label, hi_label.get_rect(center=(SCREEN_WIDTH // 2 + 100, py + 115)))
-
-        hi_value = self.font_large.render(f"{h:05d}", True, (255, 100, 100))
-        self.screen.blit(hi_value, hi_value.get_rect(center=(SCREEN_WIDTH // 2 + 100, py + 145)))
-
-        r_box = pygame.Rect(px + 40, py + 185, 180, 45)
-        pygame.draw.rect(self.screen, (60, 120, 60, 150), r_box, border_radius=8)
-        pygame.draw.rect(self.screen, (100, 200, 100), r_box, 2, border_radius=8)
-
-        r_symbol = self.font_med.render("⟳", True, GO_GREEN)
-        r_txt = self.font_med.render("RETRY", True, GO_GREEN)
-        self.screen.blit(r_symbol, r_symbol.get_rect(center=(r_box.x + 30, r_box.centery)))
-        self.screen.blit(r_txt, r_txt.get_rect(center=(r_box.x + 100, r_box.centery)))
-        r_hint = self.font_small.render("Press R", True, (150, 180, 150))
-        self.screen.blit(r_hint, r_hint.get_rect(center=(r_box.x + 100, r_box.bottom - 8)))
-
-        m_box = pygame.Rect(px + pw - 220, py + 185, 180, 45)
-        pygame.draw.rect(self.screen, (60, 60, 120, 150), m_box, border_radius=8)
-        pygame.draw.rect(self.screen, (100, 150, 200), m_box, 2, border_radius=8)
-
-        m_symbol = self.font_med.render("☰", True, (180, 180, 255))
-        m_txt = self.font_med.render("MENU", True, (180, 180, 255))
-        m_hint = self.font_small.render("Press ESC", True, (150, 150, 200))
-        self.screen.blit(m_symbol, m_symbol.get_rect(center=(m_box.x + 30, m_box.centery)))
-        self.screen.blit(m_txt, m_txt.get_rect(center=(m_box.x + 100, m_box.centery)))
-        self.screen.blit(m_hint, m_hint.get_rect(center=(m_box.x + 100, m_box.bottom - 8)))
-
+    
     def _draw_achievement_popup(self):
         """Vẽ popup thành tựu mới mở khóa - slide in từ phải sang."""
         if self.ach_popup_item is None:
@@ -638,9 +531,10 @@ class GameManager:
         self._draw_hud()
         self._draw_pause_btn()
         if self.paused:
-            self._draw_paused_overlay()
+            # self._draw_paused_overlay()
+            self.ui.draw_pause_menu()
         elif self.game_over:
-            self._draw_game_over()
+            self.ui.draw_game_over()
         self._draw_achievement_popup()
         pygame.draw.rect(self.screen, (0, 255, 0), self.dino.get_rect(), 2)
         for obs in self.obstacles:
@@ -701,6 +595,14 @@ class GameManager:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.pause_btn.collidepoint(event.pos) and not self.game_over:
                         self.toggle_pause()
+                    if  self.paused :
+                        action = self.ui.handle_pause_menu_click(event.pos)
+                        if action == "Resume":
+                            self.paused = False
+                        elif action == "Restart":
+                            self.reset()
+                        elif action == "Quit":
+                            running = False
 
             # Update với jump_held để hỗ trợ variable jump height
             self.update(speed_mult=speed_mult, jump_held=jump_held)
