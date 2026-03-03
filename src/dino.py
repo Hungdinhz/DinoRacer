@@ -204,14 +204,44 @@ class Dino:
                 self.anim_frame = (self.anim_frame + 1) % _ANIM_FRAMES.get(anim, 1)
 
     def get_rect(self):
-        h = self.height
+        # Tạo khung hình chữ nhật ban đầu bao quanh toàn bộ bức ảnh
+        rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        
         if self.is_ducking:
-            h = int(self.height * DUCK_HEIGHT_RATIO)
-        self._cached_rect = pygame.Rect(self.x, self.y + (self.height - h), self.width, h)
+            # ==========================================
+            # TRƯỜNG HỢP 1: KHI KHỦNG LONG CÚI (DÀI & LÙN)
+            # ==========================================
+            trim_left = 5      # Đuôi vểnh ra nên chỉ gọt một chút xíu
+            trim_right = 5     # Mõm chúi tới trước nên cũng gọt ít thôi
+            trim_top = int(self.height * 0.3) # Gọt bay gần một nửa phần trên vì nó cúi bẹp xuống
+            trim_bottom = 0    # Chân chạm đất
+            
+        else:
+            # ==========================================
+            # TRƯỜNG HỢP 2: KHI ĐỨNG CHẠY / NHẢY
+            # ==========================================
+            trim_left = 15     # Cắt gáy / đuôi
+            trim_right = 15    # Cắt phần trước mặt
+            trim_top = 10      # Cắt khoảng trống trên đỉnh đầu
+            trim_bottom = 0    # Chân chạm đất
+            
+        # Áp dụng các nhát cắt vào khung xanh
+        rect.x += trim_left
+        rect.width -= (trim_left + trim_right)
+        
+        rect.y += trim_top
+        rect.height -= (trim_top + trim_bottom)
+        
+        self._cached_rect = rect
         return self._cached_rect
 
     def draw(self, screen):
-        rect = self.get_rect()
+        # Tạo một khung vẽ ảnh nguyên vẹn từ tọa độ x, y gốc (ảnh sẽ đứng im)
+        h = self.height
+        if self.is_ducking:
+            h = int(self.height * DUCK_HEIGHT_RATIO)
+        rect = pygame.Rect(self.x, self.y + (self.height - h), self.width, h)
+        # -------------------------
         anim = self._anim_name()
         num_frames = _ANIM_FRAMES.get(anim, 1)
 
@@ -250,9 +280,9 @@ class Dino:
                 offset_x = (self.width - new_w) // 2
                 offset_y = (self.height - new_h) - ((self.height - new_h) // 2)
 
-                screen.blit(scaled, (rect.x + offset_x, rect.y + offset_y))
+                screen.blit(scaled, (self.x + offset_x, self.y + offset_y))
             else:
-                screen.blit(frame, (rect.x, rect.y))
+                screen.blit(frame, (self.x, self.y))
         else:
             # Fallback vẽ tay với squash & stretch
             w = int(rect.width * self._scale_x)

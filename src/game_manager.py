@@ -305,7 +305,7 @@ class GameManager:
         self.spawn_obstacle()
 
         self.ground_offset = (self.ground_offset + self.game_speed * speed_mult) % 64
-        self.bg_offset = (self.bg_offset + self.game_speed * speed_mult * 0.15) % SCREEN_WIDTH
+        self.bg_offset = (self.bg_offset + self.game_speed * speed_mult * 0.05) % SCREEN_WIDTH
 
         prev_score = self.score
         for obs in self.obstacles:
@@ -401,16 +401,22 @@ class GameManager:
         self.screen.blit(bg, (-ox, 0))
         if ox > 0:
             self.screen.blit(bg, (SCREEN_WIDTH - ox, 0))
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        # (255, 255, 255, 70) là màu trắng với độ mờ 70/255. 
+        # Nếu bạn muốn không gian u ám/tối hơn, hãy đổi thành màu đen: (0, 0, 0, 80)
+        overlay.fill((255, 255, 255, 100)) 
+        self.screen.blit(overlay, (0, 0))
 
     def _draw_ground(self):
         tile_h = SCREEN_HEIGHT - GROUND_Y
         tile_w = 64
+        y_offset = 30
         # Sử dụng cached tile
         tile = _get_cached_tile("Tile_02.png", (tile_w, tile_h))
         if tile:
             offset = int(self.ground_offset) % tile_w
             for x in range(-tile_w, SCREEN_WIDTH + tile_w, tile_w):
-                self.screen.blit(tile, (x - offset, GROUND_Y))
+                self.screen.blit(tile, (x - offset, GROUND_Y- y_offset))
         else:
             pygame.draw.rect(self.screen, GROUND_COL,
                              (0, GROUND_Y, SCREEN_WIDTH, tile_h))
@@ -622,6 +628,9 @@ class GameManager:
         elif self.game_over:
             self._draw_game_over()
         self._draw_achievement_popup()
+        pygame.draw.rect(self.screen, (0, 255, 0), self.dino.get_rect(), 2)
+        for obs in self.obstacles:
+            pygame.draw.rect(self.screen, (255, 0, 0), obs.get_rect(), 2)
         pygame.display.flip()
 
     def run_human_mode(self):

@@ -137,11 +137,21 @@ def init_mixer():
 def get_sound(name):
     if name not in _sounds:
         init_mixer()
-        full = os.path.join(get_assets_path(), "sounds", name + ".wav")
-        try:
-            _sounds[name] = pygame.mixer.Sound(full) if os.path.exists(full) else None
-        except pygame.error:
-            _sounds[name] = None
+        base_path = os.path.join(get_assets_path(), "sounds", name)
+        sound_loaded = None
+        
+        # Danh sách các đuôi file âm thanh muốn hỗ trợ
+        for ext in [".wav", ".mp3", ".ogg"]:
+            full = base_path + ext
+            if os.path.exists(full):
+                try:
+                    sound_loaded = pygame.mixer.Sound(full)
+                    break  # Nếu tìm thấy và load thành công thì thoát vòng lặp luôn
+                except pygame.error:
+                    pass   # Nếu file lỗi thì bỏ qua, thử đuôi tiếp theo
+                    
+        _sounds[name] = sound_loaded
+        
     return _sounds[name]
 
 

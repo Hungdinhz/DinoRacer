@@ -1,0 +1,28 @@
+{
+  "achievements": {
+    "score_100": {
+      "unlocked_at": "2026-03-03 09:19:12",
+      "name": "Beginner Runner",
+      "description": "Score 100 points",
+      "icon": "\ud83c\udfc3",
+      "requirement": {
+        "type": "score",
+        "value": 100
+      }
+    },
+    "obstacles_50": {
+      "unlocked_at": "2026-03-03 09:19:12",
+      "name": "Dodger",
+      "description": "Pass 50 obstacles",
+      "icon": "\ud83c\udfaf",
+      "requirement": {
+        "type": "obstacles",
+        "value": 50
+      }
+    }
+  },
+  "unlocked": [
+    "obstacles_50",
+    "score_100"
+  ]
+}

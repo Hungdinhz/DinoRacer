@@ -5,7 +5,7 @@ Cactus dùng tile sprite hoặc fallback vẽ tay.
 """
 import pygame
 import random
-from src.assets_loader import get_sheet, load_image
+from src.assets_loader import get_sheet, load_image, play_sound
 from config.settings import (
     GROUND_Y,
     CACTUS_WIDTH, CACTUS_HEIGHT_SMALL, CACTUS_HEIGHT_LARGE, CACTUS_COLOR,
@@ -85,46 +85,70 @@ class Cactus(Obstacle):
             pygame.draw.rect(screen, (0, 120, 0), (mid, arm_y + 10, self.x + self.width - mid, 7))
             pygame.draw.rect(screen, (0, 120, 0), (self.x + self.width - 7, arm_y - 2, 7, 18))
 
+# Cache cho animation của chim bay, dùng tuple (width, height) làm key
+_bird_cache = {}
 
+def _get_bird_frames(w, h):
+    """Load 7 frame ảnh của chim theo kích thước yêu cầu."""
+    key = (w, h)
+    if key not in _bird_cache:
+        frames = []
+        for i in range(1, 8):
+            img = load_image(f"bird/{i}.png", (w, h))
+            if img:
+                frames.append(img)
+        _bird_cache[key] = frames
+    return _bird_cache[key] 
 class Bird(Obstacle):
-    """Chim với animation và __slots__"""
-    __slots__ = ('width', 'height', 'y', 'anim_frame', 'anim_timer', '_anim')
+    """Chim với animation đập cánh dùng hình ảnh thực từ thư mục"""
+    __slots__ = ('width', 'height', 'y', 'anim_frame', 'anim_timer')
 
     def __init__(self, x, speed):
         super().__init__(x, speed)
-        self.width = BIRD_WIDTH
-        self.height = BIRD_HEIGHT
-        # Calculate heights dynamically based on GROUND_Y
-        self.y = random.choice([GROUND_Y - 130, GROUND_Y - 85, GROUND_Y - 50])
+        
+        # --- TĂNG KÍCH THƯỚC Ở ĐÂY ---
+        scale_factor = 1.8  # Tăng lên 1.8 lần (bạn có thể đổi thành 2.0 hoặc 1.5 tùy ý)
+        self.width = int(BIRD_WIDTH * scale_factor)
+        self.height = int(BIRD_HEIGHT * scale_factor)
+        
+        # Điều chỉnh lại độ cao bay để chim to không bị quệt bụng xuống đất
+        self.y = random.choice([GROUND_Y - 140, GROUND_Y - 95, GROUND_Y - 60])
         self.anim_frame = 0
         self.anim_timer = 0
-        self._anim = "move"   # dùng move.png làm animation chính
-
-    def update(self):
-        super().update()
-        self.anim_timer += 1
-        if self.anim_timer >= _BIRD_ANIM_SPEED:
-            self.anim_timer = 0
-            num = _BIRD_ANIM_FRAMES.get(self._anim, 6)
-            self.anim_frame = (self.anim_frame + 1) % num
+        play_sound("bird")
 
     def get_rect(self):
-        return pygame.Rect(self.x, self.y, self.width, self.height)
+        # Lấy rect tổng thể bao quanh bức ảnh (cái ô màu đỏ khổng lồ bạn đang thấy)
+        collide_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+
+        # Bây giờ, chúng ta sẽ "gọt" nó cho nhỏ lại.
+        # Bạn có thể tăng giảm hai con số này để cái khung khớp nhất với con chim.
+        # Chúng ta sẽ thu nhỏ 60 pixel chiều ngang (mỗi bên 30)
+        # Và thu nhỏ 50 pixel chiều dọc (mỗi bên 25)
+        trimmed_rect = collide_rect.inflate(-60, -50)
+        
+        return trimmed_rect
 
     def draw(self, screen):
         rect = self.get_rect()
-        # Bird vẽ thủ công (fallback) vì không có sprite chim riêng
-        # Không dùng ai_dino vì sẽ bị nhầm với khủng long AI
-        pygame.draw.ellipse(screen, BIRD_COLOR,
-                            (self.x + 5, self.y + 8, self.width - 10, self.height - 12))
-        wing_y = self.y if self.anim_frame % 2 == 0 else self.y + self.height - 10
-        pygame.draw.ellipse(screen, (80, 80, 180), (self.x, wing_y, self.width, 12))
-        pygame.draw.circle(screen, (255, 255, 255),
-                           (self.x + self.width - 12, self.y + 12), 5)
-        pygame.draw.circle(screen, (0, 0, 0),
-                           (self.x + self.width - 11, self.y + 12), 2)
-
-
+        frames = _get_bird_frames(self.width, self.height)
+        
+        # --- LOGIC ANIMATION CHUYỂN VÀO ĐÂY ---
+        # Do game_manager không gọi hàm update(), ta ép nó chạy ở đây
+        self.anim_timer += 1
+        if frames and self.anim_timer >= _BIRD_ANIM_SPEED:
+            self.anim_timer = 0
+            self.anim_frame = (self.anim_frame + 1) % len(frames)
+        
+        # Ưu tiên vẽ ảnh thật
+        if frames and self.anim_frame < len(frames):
+            # Vẽ ảnh tại tọa độ thực của chim (không tính margin của hitbox)
+            screen.blit(frames[self.anim_frame], (self.x, self.y))
+        else:
+            # Fallback (Vẽ tay) nếu lỗi ảnh
+            pygame.draw.ellipse(screen, BIRD_COLOR,
+                                (self.x, self.y, self.width, self.height))
+            
 def create_obstacle(x, speed):
     if random.random() < 0.7:
         return Cactus(x, speed)
