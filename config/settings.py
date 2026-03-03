@@ -23,11 +23,11 @@ DINO_X = 100
 DINO_WIDTH = 80
 DINO_HEIGHT = 80
 GRAVITY = 0.8           # Gravity nhẹ hơn cho cảm giác nhảy mượt hơn
-JUMP_VELOCITY = -18
+JUMP_VELOCITY = -15
 
 # Smooth physics - Giúp cảm giác nhảy mượt mà hơn
 JUMP_HOLD_GRAVITY = 0.4  # Gravity khi giữ nút nhảy (nhảy cao hơn)
-JUMP_MIN_VELOCITY = -6   # Velocity tối thiểu khi thả sớm
+JUMP_MIN_VELOCITY = -7   # Velocity tối thiểu khi thả sớm
 JUMP_CURVE = 0.15        # Jump curve - giá trị càng lớn càng cong
 
 # Coyote time - Cho phép nhảy sau khi rời chân trong 1 khoảng thời gian ngắn

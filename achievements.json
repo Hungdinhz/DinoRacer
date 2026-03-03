@@ -19,10 +19,21 @@
         "type": "obstacles",
         "value": 50
       }
+    },
+    "obstacles_200": {
+      "unlocked_at": "2026-03-03 21:35:23",
+      "name": "Expert Dodger",
+      "description": "Pass 200 obstacles",
+      "icon": "\u2b50",
+      "requirement": {
+        "type": "obstacles",
+        "value": 200
+      }
     }
   },
   "unlocked": [
-    "obstacles_50",
-    "score_100"
+    "obstacles_200",
+    "score_100",
+    "obstacles_50"
   ]
 }

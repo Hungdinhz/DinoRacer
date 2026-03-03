@@ -228,11 +228,25 @@ class GameManager:
         self.paused = not self.paused
 
     def spawn_obstacle(self):
-        if self.last_obstacle_x - SCREEN_WIDTH < -MIN_OBSTACLE_SPAWN_DISTANCE:
+        # Lấy khoảng cách mục tiêu, nếu chưa có thì lấy số mặc định là 400
+        target_distance = getattr(self, 'next_spawn_distance', 400)
+        
+        # Kiểm tra xem chướng ngại vật cuối cùng đã trôi vào đủ sâu chưa
+        if (SCREEN_WIDTH - self.last_obstacle_x) > target_distance:
             speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
-            obs = create_obstacle(SCREEN_WIDTH + 50, speed)
+            
+            # Khởi tạo chướng ngại vật mới ở tít ngoài mép phải màn hình
+            spawn_x = SCREEN_WIDTH + random.randint(50, 150)
+            obs = create_obstacle(spawn_x, speed)
             self.obstacles.append(obs)
             self.last_obstacle_x = obs.x
+            
+            # ==========================================
+            # BỐC THĂM KHOẢNG CÁCH CHO LẦN XUẤT HIỆN SAU
+            # ==========================================
+            # 300 là khoảng cách gần nhất (đủ để khủng long nhảy qua 2 cây)
+            # 700 là khoảng cách xa nhất (khoảng trống để người chơi thở)
+            self.next_spawn_distance = random.randint(300, 700)
 
     def check_collision(self):
         # Early exit nếu không có obstacle

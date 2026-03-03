@@ -155,10 +155,16 @@ def get_sound(name):
     return _sounds[name]
 
 
-def play_sound(name):
+def play_sound(name, volume=1.0):
+    """
+    Phát âm thanh với mức âm lượng tùy chỉnh.
+    volume: từ 0.0 (im lặng) đến 1.0 (to nhất mặc định)
+    """
     s = get_sound(name)
     if s:
         try:
+            # Cài đặt âm lượng trước khi phát
+            s.set_volume(volume) 
             s.play()
         except pygame.error:
             pass

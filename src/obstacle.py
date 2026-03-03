@@ -16,22 +16,6 @@ from config.settings import (
 _BIRD_ANIM_FRAMES = {"move": 6, "idle": 3}
 _BIRD_ANIM_SPEED  = 6   # game-frames mỗi sprite-frame
 
-# Enhanced cactus cache với LRU
-_cactus_cache = {}
-_CACTUS_CACHE_MAX_SIZE = 10
-
-
-def _get_cactus_sprite(w, h):
-    key = (w, h)
-    if key not in _cactus_cache:
-        # Xóa cache cũ nếu quá lớn
-        if len(_cactus_cache) >= _CACTUS_CACHE_MAX_SIZE:
-            _cactus_cache.clear()
-        img = load_image("willow/3.png", (w, h))
-        if img is None:
-            img = load_image("willows/1.png", (w, h))
-        _cactus_cache[key] = img
-    return _cactus_cache[key]
 
 
 class Obstacle:
@@ -54,11 +38,34 @@ class Obstacle:
 
     def is_off_screen(self):
         return self.x < -100
+# ==========================================
+# CACHE CHO CHƯỚNG NGẠI VẬT DƯỚI ĐẤT
+# ==========================================
+_obstacle_cache = {}
+_OBSTACLE_CACHE_MAX_SIZE = 20
 
+def _get_obstacle_sprite(filename, w, h):
+    """Load ảnh chướng ngại vật linh hoạt theo tên file"""
+    key = (filename, w, h)
+    if key not in _obstacle_cache:
+        # Xóa cache cũ nếu quá lớn
+        if len(_obstacle_cache) >= _OBSTACLE_CACHE_MAX_SIZE:
+            _obstacle_cache.clear()
+        
+        # Load ảnh từ đường dẫn truyền vào
+        img = load_image(filename, (w, h))
+        _obstacle_cache[key] = img
+        
+    return _obstacle_cache[key]
 
+# ==========================================
+# CLASS CHƯỚNG NGẠI VẬT DƯỚI ĐẤT (Giữ tên Cactus để không hỏng code cũ)
+# ==========================================
 class Cactus(Obstacle):
-    """Cactus với __slots__"""
-    __slots__ = ('is_large', 'width', 'height', 'y')
+    """Chướng ngại vật đa dạng (Cây, đá, bụi rậm...) với __slots__"""
+    
+    # Thêm 'image_path' vào __slots__ để lưu đường dẫn ảnh
+    __slots__ = ('is_large', 'width', 'height', 'y', 'image_path')
 
     def __init__(self, x, speed):
         super().__init__(x, speed)
@@ -66,24 +73,56 @@ class Cactus(Obstacle):
         self.width = CACTUS_WIDTH
         self.height = CACTUS_HEIGHT_LARGE if self.is_large else CACTUS_HEIGHT_SMALL
         self.y = GROUND_Y - self.height
+    # ==========================================
+        # CHỈNH KÍCH THƯỚC TO HƠN Ở ĐÂY
+        # ==========================================
+        scale_factor = 1.5  # Phóng to gấp rưỡi (1.5). Bạn có thể đổi thành 1.8 hoặc 2.0 tùy ý
+        base_width = CACTUS_WIDTH
+        base_height = CACTUS_HEIGHT_LARGE if self.is_large else CACTUS_HEIGHT_SMALL
+        
+        # Ép kiểu int để kích thước không bị lẻ
+        self.width = int(base_width * scale_factor)
+        self.height = int(base_height * scale_factor)
+        
+        # Tính toán lại tọa độ y để gốc cây/đá vẫn nằm sát mặt đất
+        self.y = GROUND_Y - self.height
+        # --- DANH SÁCH ẢNH RANDOM ---
+        # Bạn có thể THÊM hoặc XÓA tên các file ảnh bạn có trong thư mục assets/images vào đây
+        obstacle_list = [
+            "willows/1.png",
+            "willows/2.png", 
+            "willows/3.png",
+            "trees/1.png",
+            "trees/2.png",
+            "trees/3.png",
+            "stones/1.png",
+            "stones/3.png",
+            "stones/4.png",
+            "stones/5.png"
+        ]
+        # Bốc ngẫu nhiên 1 ảnh cho chướng ngại vật này
+        self.image_path = random.choice(obstacle_list)
 
     def get_rect(self):
-        return pygame.Rect(self.x, self.y, self.width, self.height)
+        # Tạo khung va chạm (có thể gọt bớt viền bằng .inflate() nếu ảnh có viền tàng hình)
+        rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        # Ví dụ gọt viền: rect = rect.inflate(-10, -10)
+        return rect
 
     def draw(self, screen):
         rect = self.get_rect()
-        sprite = _get_cactus_sprite(self.width, self.height)
+        
+        # Gọi hàm lấy ảnh, truyền vào image_path đã random ở trên
+        sprite = _get_obstacle_sprite(self.image_path, self.width, self.height)
+        
         if sprite:
-            screen.blit(sprite, rect)
+            # Nếu load thành công thì in ảnh ra
+            # Chú ý: Dùng self.x và self.y để in ảnh gốc, không bị lệch do gọt hitbox (giống vụ Dino)
+            screen.blit(sprite, (self.x, self.y))
         else:
-            # Fallback vẽ tay xương rồng
-            mid = self.x + self.width // 2
-            pygame.draw.rect(screen, (0, 120, 0), (mid - 5, self.y, 10, self.height))
-            arm_y = self.y + self.height // 3
-            pygame.draw.rect(screen, (0, 120, 0), (self.x, arm_y, mid - self.x, 7))
-            pygame.draw.rect(screen, (0, 120, 0), (self.x, arm_y - 12, 7, 18))
-            pygame.draw.rect(screen, (0, 120, 0), (mid, arm_y + 10, self.x + self.width - mid, 7))
-            pygame.draw.rect(screen, (0, 120, 0), (self.x + self.width - 7, arm_y - 2, 7, 18))
+            # Fallback nếu tên file bị gõ sai hoặc ảnh bị xóa mất
+            pygame.draw.rect(screen, (0, 150, 50), rect, border_radius=5)
+
 
 # Cache cho animation của chim bay, dùng tuple (width, height) làm key
 _bird_cache = {}
@@ -115,7 +154,7 @@ class Bird(Obstacle):
         self.y = random.choice([GROUND_Y - 140, GROUND_Y - 95, GROUND_Y - 60])
         self.anim_frame = 0
         self.anim_timer = 0
-        play_sound("bird")
+        play_sound("bird", volume=0.08)
 
     def get_rect(self):
         # Lấy rect tổng thể bao quanh bức ảnh (cái ô màu đỏ khổng lồ bạn đang thấy)
