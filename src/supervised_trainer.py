@@ -28,15 +28,16 @@ def load_training_data():
     X = []
     y_jump = []
     y_duck = []
-    
+
     # Thử load từ database trước
     if DATABASE_AVAILABLE:
         try:
             conn = get_connection()
             cursor = conn.cursor()
+            # Updated query to include distance_to_obstacle_2 (8 inputs total)
             cursor.execute("""
-                SELECT distance_to_obstacle, obstacle_type, game_speed, 
-                       dino_height, is_jumping, is_ducking,
+                SELECT distance_to_obstacle, obstacle_type, COALESCE(distance_to_obstacle_2, 1.0) as dist2,
+                       game_speed, dino_height, is_jumping, is_ducking,
                        action_jump, action_duck
                 FROM training_data
                 WHERE quality_score >= 0.7
@@ -44,14 +45,15 @@ def load_training_data():
             rows = cursor.fetchall()
             cursor.close()
             conn.close()
-            
+
             for row in rows:
+                # 8 inputs: [dist1, type1, dist2, speed, height, is_jumping, is_ducking, bias]
                 X.append([
-                    row[0], row[1], row[2], row[3], row[4], row[5]
+                    row[0], row[1], row[2], row[3], row[4], row[5], row[6], 0.5
                 ])
-                y_jump.append(row[6])
-                y_duck.append(row[7])
-            
+                y_jump.append(row[7])
+                y_duck.append(row[8])
+
             print(f"Loaded {len(X)} samples from database")
             return np.array(X), np.array(y_jump), np.array(y_duck)
         except Exception as e:
@@ -166,17 +168,19 @@ def load_models():
 
 def predict_action(jump_model, jump_scaler, duck_model, duck_scaler, inputs):
     """
-    Dự đoán action từ inputs
-    inputs: [distance_to_obstacle, obstacle_type, game_speed, dino_height, is_jumping, is_ducking]
+    Dự đoan action tu inputs
+    inputs: [dist1, type1, dist2, speed, height, is_jumping, is_ducking, bias] (8 values)
+    Supervised model chi can 6 features: [dist1, type1, speed, height, is_jumping, is_ducking]
     """
-    # Scale inputs
-    inputs = np.array(inputs).reshape(1, -1)
-    inputs_scaled = jump_scaler.transform(inputs)
-    
+    # Chi dung 6 features cho supervised (bo dist2 va bias)
+    supervised_inputs = [inputs[0], inputs[1], inputs[3], inputs[4], inputs[5], inputs[6]]
+    inputs_arr = np.array(supervised_inputs).reshape(1, -1)
+    inputs_scaled = jump_scaler.transform(inputs_arr)
+
     # Predict
     jump_prob = jump_model.predict_proba(inputs_scaled)[0][1]
     duck_prob = duck_model.predict_proba(inputs_scaled)[0][1]
-    
+
     # Return action (jump, duck)
     return (1 if jump_prob > 0.5 else 0, 1 if duck_prob > 0.5 else 0, jump_prob, duck_prob)
 
@@ -252,7 +256,7 @@ if __name__ == "__main__":
     
     if jump_data and duck_data:
         # Test với một input mẫu
-        test_input = [0.3, 0.0, 0.5, 0.0, 0.0, 0.0]  # Cactus, 30% distance, medium speed
+        test_input = [0.3, 0.0, 1.0, 0.5, 0.0, 0.0, 0.0, 0.5]  # dist1, type1, dist2, speed, height, is_jumping, is_ducking, bias
         action = predict_action(
             jump_data['model'], jump_data['scaler'],
             duck_data['model'], duck_data['scaler'],

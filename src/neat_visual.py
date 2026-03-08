@@ -42,23 +42,52 @@ def _rank_color(rank, total):
 
 
 def _get_inputs(dino, obstacles, game_speed, ground_y=GROUND_Y):
+    """Lay 8 inputs cho NEAT (matching ai_handler.py)"""
     nearest = None
+    second_nearest = None
     min_dist = float('inf')
+    second_dist = float('inf')
+
     for obs in obstacles:
         if obs.x > dino.x:
             dist = obs.x - dino.x
             if dist < min_dist:
+                second_dist = min_dist
+                second_nearest = nearest
                 min_dist = dist
                 nearest = obs
+            elif dist < second_dist:
+                second_dist = dist
+                second_nearest = obs
+
     if nearest is None:
-        return [1.0, 0.5, 0.0, 0.0, 0.0]
-    return [
-        min(min_dist / 500, 1.0),
-        0.0 if isinstance(nearest, Cactus) else 1.0,
-        (game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN),
-        min((ground_y - dino.y) / 100, 1.0),
-        1.0 if dino.is_jumping else 0.0,
-    ]
+        return [1.0, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0, 0.5]
+
+    # 1. Khoang cach den obstacle gan nhat
+    dist1 = min(min_dist / 500, 1.0)
+
+    # 2. Loai obstacle (0 = Cactus, 1 = Bird)
+    type1 = 0.0 if isinstance(nearest, Cactus) else 1.0
+
+    # 3. Khoang cach den obstacle thu 2
+    dist2 = min(second_dist / 500, 1.0) if second_nearest else 1.0
+
+    # 4. Toc do game
+    speed_norm = (game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
+
+    # 5. Chieu cao dino
+    height_norm = min((ground_y - dino.y) / 100, 1.0)
+
+    # 6. Dang nhay
+    is_jumping = 1.0 if dino.is_jumping else 0.0
+
+    # 7. Dang cui
+    is_ducking = 1.0 if dino.is_ducking else 0.0
+
+    # 8. Bias
+    bias = 0.5
+
+    return [dist1, type1, dist2, speed_norm, height_norm, is_jumping, is_ducking, bias]
 
 
 class NeatVisualTrainer:

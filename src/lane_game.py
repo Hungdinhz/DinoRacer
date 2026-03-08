@@ -276,7 +276,7 @@ class LaneGame:
 
         # Handle AI action
         if action is not None:
-            jump, duck, _ = action
+            jump, duck = action[0], action[1] if len(action) > 1 else (0, 0)
             if jump > 0.5:
                 self.dino.jump()
                 actual_action = (1, 0)

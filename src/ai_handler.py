@@ -116,17 +116,20 @@ def eval_genome(genome, config):
     score = INITIAL_SCORE
     game_speed = OBSTACLE_SPEED_MIN
     last_obstacle_x = SCREEN_WIDTH
+    frames_survived = 0
 
-    for _ in range(5000):
+    for i in range(5000):
+        frames_survived = i
         inputs = _get_inputs(dino, obstacles, game_speed)
         output = net.activate(inputs)
-        jump, duck, _ = output
+        jump, duck = output[:2]
         if jump > 0.5:
             dino.jump()
         dino.set_duck(duck > 0.5)  # AI dùng set_duck thay vì duck
         dino.update(jump_held=False)  # AI không giữ phím
 
-        if last_obstacle_x - SCREEN_WIDTH < -MIN_OBSTACLE_SPAWN_DISTANCE:
+        # Spawn new obstacle if enough distance from last one
+        if len(obstacles) == 0 or last_obstacle_x <= SCREEN_WIDTH - MIN_OBSTACLE_SPAWN_DISTANCE:
             obs = create_obstacle(SCREEN_WIDTH + 50, min(game_speed, OBSTACLE_SPEED_MAX))
             obstacles.append(obs)
             last_obstacle_x = obs.x
@@ -153,12 +156,13 @@ def eval_genome(genome, config):
             if dino_rect.inflate(-margin, -margin).colliderect(obs.get_rect().inflate(-margin, -margin)):
                 # Cải thiện fitness: thưởng nhiều hơn khi sống lâu ở tốc độ cao
                 speed_bonus = (game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
-                final_fitness = score * 10 * (1 + speed_bonus)
+                final_fitness = frames_survived + score * 10 * (1 + speed_bonus)
                 return final_fitness
 
     # Cải thiện fitness: thưởng nhiều hơn khi sống lâu ở tốc độ cao
     speed_bonus = (game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
-    final_fitness = score * 10 * (1 + speed_bonus)
+    # Use frames survived + score as fitness (prevents zero fitness)
+    final_fitness = frames_survived + score * 10 * (1 + speed_bonus)
     return final_fitness
 
 
@@ -203,8 +207,107 @@ def run_best_genome_display(genome, config):
             inputs = _get_inputs(gm.dino, gm.obstacles, gm.game_speed)
             output = net.activate(inputs)
             gm.update(action=output, jump_held=False)
-        
+
         gm.draw()
         clock.tick(FPS)
 
     return genome
+
+
+# ============================================
+# HYBRID AI - Kết hợp NEAT và Supervised
+# ============================================
+
+class HybridAI:
+    """Hybrid AI kết hợp NEAT và Supervised Learning"""
+
+    def __init__(self, neat_genome=None, neat_config=None, neat_weight=0.3):
+        """
+        Khởi tạo Hybrid AI
+        - neat_genome: NEAT genome (nếu None sẽ load từ file)
+        - neat_config: NEAT config
+        - neat_weight: Trọng số của NEAT (0-1), supervised sẽ là (1 - neat_weight)
+        """
+        self.neat_net = None
+        self.supervised_jump_model = None
+        self.supervised_duck_model = None
+        self.supervised_scaler = None
+        self.neat_weight = neat_weight
+
+        # Load NEAT
+        if neat_genome and neat_config:
+            self.neat_net = neat.nn.FeedForwardNetwork.create(neat_genome, neat_config)
+        else:
+            # Thử load từ file
+            genome, config = load_genome()
+            if genome and config:
+                self.neat_net = neat.nn.FeedForwardNetwork.create(genome, config)
+
+        # Load Supervised models
+        try:
+            from src.supervised_trainer import load_models
+            jump_data, duck_data = load_models()
+            if jump_data and duck_data:
+                self.supervised_jump_model = jump_data['model']
+                self.supervised_duck_model = duck_data['model']
+                self.supervised_scaler = jump_data['scaler']
+                print("Hybrid AI: Loaded both NEAT and Supervised models")
+            else:
+                print("Hybrid AI: Chỉ có NEAT (Supervised models chưa train)")
+        except Exception as e:
+            print(f"Hybrid AI: Lỗi load supervised: {e}")
+            print("Hybrid AI: Chỉ dùng NEAT")
+
+    def predict(self, inputs):
+        """
+        Dự đoán action kết hợp từ cả 2 model
+        inputs: 8 giá trị [dist1, type1, dist2, speed, height, is_jumping, is_ducking, bias]
+        Returns: (jump, duck) với giá trị 0-1
+        """
+        neat_jump = 0
+        neat_duck = 0
+
+        # NEAT prediction
+        if self.neat_net:
+            neat_output = self.neat_net.activate(inputs)
+            neat_jump = neat_output[0]
+            neat_duck = neat_output[1] if len(neat_output) > 1 else 0
+
+        # Nếu không có supervised, chỉ dùng NEAT
+        if not self.supervised_jump_model:
+            return (1 if neat_jump > 0.5 else 0, 1 if neat_duck > 0.5 else 0)
+
+        # Supervised prediction - chỉ dùng 6 features đầu (bỏ dist2 và bias)
+        try:
+            import numpy as np
+            # Supervised model được train với 6 features: [dist1, type1, speed, height, is_jumping, is_ducking]
+            supervised_inputs = [inputs[0], inputs[1], inputs[3], inputs[4], inputs[5], inputs[6]]
+            inputs_arr = np.array(supervised_inputs).reshape(1, -1)
+            inputs_scaled = self.supervised_scaler.transform(inputs_arr)
+
+            sup_jump_prob = self.supervised_jump_model.predict_proba(inputs_scaled)[0][1]
+            sup_duck_prob = self.supervised_duck_model.predict_proba(inputs_scaled)[0][1]
+
+            # Rule-based combination: NEAT with safety override
+            dist1 = inputs[0]  # normalized distance to nearest obstacle
+
+            # If obstacle is close (< 25% of screen), FORCE JUMP
+            if dist1 < 0.25:
+                return (1, 0)
+
+            # Otherwise use NEAT output directly
+            final_jump = 1 if neat_jump > 0.3 else 0
+            final_duck = 0  # Disable duck for safety
+
+            return (final_jump, final_duck)
+
+        except Exception as e:
+            # Nếu supervised lỗi, fallback về NEAT
+            print(f"Hybrid AI warning: {e}")
+            return (1 if neat_jump > 0.5 else 0, 1 if neat_duck > 0.5 else 0)
+
+
+def get_hybrid_ai():
+    """Factory function để lấy Hybrid AI instance"""
+    genome, config = load_genome()
+    return HybridAI(neat_genome=genome, neat_config=config, neat_weight=0.3)
