@@ -151,7 +151,7 @@ class Bird(Obstacle):
         self.height = int(BIRD_HEIGHT * scale_factor)
         
         # Điều chỉnh lại độ cao bay để chim to không bị quệt bụng xuống đất
-        self.y = random.choice([GROUND_Y - 140, GROUND_Y - 95, GROUND_Y - 60])
+        self.y = random.choice([GROUND_Y - 150, GROUND_Y - 110])
         self.anim_frame = 0
         self.anim_timer = 0
         play_sound("bird", volume=0.08)

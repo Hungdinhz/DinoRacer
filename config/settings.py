@@ -50,6 +50,10 @@ CACTUS_HEIGHT_LARGE = 90
 BIRD_WIDTH = 70
 BIRD_HEIGHT = 45
 
+# Vật phẩm(Item) - Coin
+COIN_WIDTH = 40
+COIN_HEIGHT = 40
+
 # Tốc độ chướng ngại vật - Điều chỉnh cho màn hình lớn hơn
 OBSTACLE_SPEED_MIN = 7
 OBSTACLE_SPEED_MAX = 20

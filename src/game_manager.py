@@ -8,10 +8,11 @@ from config.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y,
     INITIAL_SCORE, SPEED_INCREASE_INTERVAL, SPEED_INCREASE_AMOUNT,
     MIN_OBSTACLE_SPAWN_DISTANCE, OBSTACLE_SPEED_MIN, OBSTACLE_SPEED_MAX,
-    COLLISION_MARGIN,
+    COLLISION_MARGIN, COIN_HEIGHT, COIN_WIDTH
 )
 from src.dino import Dino
 from src.obstacle import create_obstacle
+from src.items import Coin
 from src.highscore import load_highscore, save_highscore
 from src.assets_loader import play_sound, load_image, CLOUD_POSITIONS
 from src.achievements import check_achievements
@@ -207,6 +208,7 @@ class GameManager:
         skin = getattr(game_settings, 'skin_dino', 'dino') if not self.is_ai_mode else 'ai_dino'
         self.dino = Dino(folder=skin)
         self.obstacles = []
+        self.items = []
         self.score = INITIAL_SCORE
         self.game_speed = OBSTACLE_SPEED_MIN
         self.last_obstacle_x = 0
@@ -219,6 +221,7 @@ class GameManager:
         self._dust_spawn_timer = 0
         self.go_flash_timer = 0
         self.bg_index = 1
+
         # Achievement popup state
         self.pending_achievements = []
         self.ach_popup_timer = 0
@@ -240,7 +243,7 @@ class GameManager:
             speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
             
             # Khởi tạo chướng ngại vật mới ở tít ngoài mép phải màn hình
-            spawn_x = SCREEN_WIDTH + random.randint(50, 150)
+            spawn_x = SCREEN_WIDTH + 50
             obs = create_obstacle(spawn_x, speed)
             self.obstacles.append(obs)
             self.last_obstacle_x = obs.x
@@ -343,6 +346,44 @@ class GameManager:
         self.game_speed = OBSTACLE_SPEED_MIN + (self.score // SPEED_INCREASE_INTERVAL) * SPEED_INCREASE_AMOUNT
         self.game_speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
         self.bg_index = min(1 + self.score // 50, 5)
+
+        # 1. Sinh ra Coin ngẫu nhiên nếu đủ điều kiện
+        start_coin_x = SCREEN_WIDTH + 50
+        dist_to_last_obs = start_coin_x - self.last_obstacle_x
+
+        self.last_coin_x = max(i.x for i in self.items) if self.items else 0
+        dist_to_last_coin = start_coin_x - self.last_coin_x
+        if self.items:
+            last_coin_x = max(i.x for i in self.items)
+        else:
+            last_coin_x = 0
+
+        if (len(self.items) < 5 and random.random() < 0.1 and 
+            dist_to_last_obs > 50 and dist_to_last_coin > 50):
+                count_coins = random.randint(1, 4)
+                for i in range(count_coins):
+                    if len(self.items) < 5 :
+                        coin_x = start_coin_x + i * 50
+                        coin_speed = self.game_speed
+                        self.items.append(Coin(coin_x, coin_speed))
+
+        # 2. Cập nhật và kiểm tra ăn Coin
+        dino_rect = self.dino.get_rect()
+        for item in self.items:
+            
+            old_x = item.x
+            item.update()
+            actual_speed = item.speed * speed_mult
+            item.x = old_x - actual_speed
+            
+           
+            if dino_rect.colliderect(item.get_rect()) and not item.is_collected:
+                item.is_collected = True
+                self.score += item.bonus_points 
+                play_sound("score") # Phát tiếng Ting
+
+        # 3. Lọc bỏ các Coin đã bay ra khỏi màn hình hoặc ĐÃ BỊ ĂN
+        self.items = [i for i in self.items if not i.is_off_screen() and not i.is_collected]
 
         for c in self.clouds:
             c.update()
@@ -539,6 +580,10 @@ class GameManager:
         pygame.draw.rect(self.screen, (0, 255, 0), self.dino.get_rect(), 2)
         for obs in self.obstacles:
             pygame.draw.rect(self.screen, (255, 0, 0), obs.get_rect(), 2)
+
+        for item in self.items:
+            item.draw(self.screen)
+
         pygame.display.flip()
 
     def run_human_mode(self):
