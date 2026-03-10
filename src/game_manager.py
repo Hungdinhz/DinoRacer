@@ -4,6 +4,23 @@ Game Manager - Quản lý vòng lặp game, tính điểm, va chạm
 import pygame
 import random
 import math
+
+# Cache cho AI models - tránh load lai nhieu lan
+_AI_CACHE = {
+    'neat': {'net': None, 'config': None, 'label': None},
+    'supervised': {'jump_model': None, 'duck_model': None, 'jump_scaler': None, 'duck_scaler': None, 'label': None},
+    'hybrid': {'ai': None, 'label': None}
+}
+
+def clear_ai_cache():
+    """Xoa cache AI"""
+    global _AI_CACHE
+    _AI_CACHE = {
+        'neat': {'net': None, 'config': None, 'label': None},
+        'supervised': {'jump_model': None, 'duck_model': None, 'jump_scaler': None, 'duck_scaler': None, 'label': None},
+        'hybrid': {'ai': None, 'label': None}
+    }
+
 from config.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y,
     INITIAL_SCORE, SPEED_INCREASE_INTERVAL, SPEED_INCREASE_AMOUNT,
@@ -294,7 +311,7 @@ class GameManager:
 
         # Xử lý input AI
         if action is not None:
-            jump, duck, _ = action
+            jump, duck = action[0], action[1] if len(action) > 1 else (0, 0)
             if jump > 0.5:
                 self.dino.jump()
             self.dino.duck(duck > 0.5)
@@ -577,6 +594,7 @@ class GameManager:
         elif self.game_over:
             self.ui.draw_game_over()
         self._draw_achievement_popup()
+#<<<<<<< HEAD
         pygame.draw.rect(self.screen, (0, 255, 0), self.dino.get_rect(), 2)
         for obs in self.obstacles:
             pygame.draw.rect(self.screen, (255, 0, 0), obs.get_rect(), 2)
@@ -657,40 +675,82 @@ class GameManager:
     def run_pve_mode(self, ai_type='neat'):
         """
         Chạy chế độ PVE.
-        ai_type: 'neat' hoặc 'supervised'
+        ai_type: 'neat', 'supervised', hoặc 'hybrid'
         """
         from src.lane_game import LaneGame, LANE_H
         from src.ai_handler import load_genome, _get_inputs_from_lane
         import neat
 
-        # Load AI
+        # Load AI (su dung cache)
         net = None
         jump_model, duck_model = None, None
         jump_scaler, duck_scaler = None, None
+        hybrid_ai = None
+        cache = _AI_CACHE.get(ai_type)
 
         if ai_type == 'neat':
-            genome, config = load_genome()
-            net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
-            ai_label = "AI (NEAT)"
-        else:
-            # Load supervised models
-            try:
-                from src.supervised_trainer import load_models, predict_action
-                jump_data, duck_data = load_models()
-                if jump_data and duck_data:
-                    jump_model, jump_scaler = jump_data['model'], jump_data['scaler']
-                    duck_model, duck_scaler = duck_data['model'], duck_data['scaler']
-                    ai_label = "AI (Supervised)"
-                else:
-                    print("Khong load duoc supervised model! Dung NEAT...")
-                    genome, config = load_genome()
-                    net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
-                    ai_label = "AI (NEAT)"
-            except Exception as e:
-                print(f"Loi load supervised: {e}. Dung NEAT...")
+            if cache and cache.get('net') is not None:
+                net = cache['net']
+                config = cache['config']
+                ai_label = cache.get('label', "AI (NEAT)")
+                print("Su dung cache NEAT AI")
+            else:
                 genome, config = load_genome()
                 net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
                 ai_label = "AI (NEAT)"
+                _AI_CACHE['neat'] = {'net': net, 'config': config, 'label': ai_label}
+                print("Da cache NEAT AI")
+
+        elif ai_type == 'supervised':
+            if cache and cache.get('jump_model') is not None:
+                jump_model = cache['jump_model']
+                duck_model = cache['duck_model']
+                jump_scaler = cache['jump_scaler']
+                duck_scaler = cache['duck_scaler']
+                ai_label = cache.get('label', "AI (Supervised)")
+                print("Su dung cache Supervised AI")
+            else:
+                try:
+                    from src.supervised_trainer import load_models, predict_action
+                    jump_data, duck_data = load_models()
+                    if jump_data and duck_data:
+                        jump_model, jump_scaler = jump_data['model'], jump_data['scaler']
+                        duck_model, duck_scaler = duck_data['model'], duck_data['scaler']
+                        ai_label = "AI (Supervised)"
+                        _AI_CACHE['supervised'] = {
+                            'jump_model': jump_model, 'duck_model': duck_model,
+                            'jump_scaler': jump_scaler, 'duck_scaler': duck_scaler,
+                            'label': ai_label
+                        }
+                        print("Da cache Supervised AI")
+                    else:
+                        print("Khong load duoc supervised model! Dung NEAT...")
+                        genome, config = load_genome()
+                        net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
+                        ai_label = "AI (NEAT)"
+                except Exception as e:
+                    print(f"Loi load supervised: {e}. Dung NEAT...")
+                    genome, config = load_genome()
+                    net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
+                    ai_label = "AI (NEAT)"
+
+        elif ai_type == 'hybrid':
+            if cache and cache.get('ai') is not None:
+                hybrid_ai = cache['ai']
+                ai_label = cache.get('label', "AI (Hybrid)")
+                print("Su dung cache Hybrid AI")
+            else:
+                try:
+                    from src.ai_handler import get_hybrid_ai
+                    hybrid_ai = get_hybrid_ai()
+                    ai_label = "AI (Hybrid)"
+                    _AI_CACHE['hybrid'] = {'ai': hybrid_ai, 'label': ai_label}
+                    print("Da cache Hybrid AI")
+                except Exception as e:
+                    print(f"Loi load hybrid: {e}. Dung NEAT...")
+                    genome, config = load_genome()
+                    net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
+                    ai_label = "AI (NEAT)"
 
         ai_lane     = LaneGame('ai_dino', ai_label, label_color=(200, 150, 255))
         player_lane = LaneGame('dino',    'PLAYER',   label_color=(255, 230, 80))
@@ -721,7 +781,13 @@ class GameManager:
                     from src.ai_handler import _get_inputs
                     inputs = _get_inputs(ai_lane.dino, ai_lane.obstacles, ai_lane.game_speed)
                     action = predict_action(jump_model, jump_scaler, duck_model, duck_scaler, inputs)
-                    ai_lane.update(action=action[:3])  # Take first 3 values
+                    ai_lane.update(action=action[:2])  # Take first 2 values (jump, duck)
+                elif ai_type == 'hybrid' and hybrid_ai:
+                    # Hybrid AI prediction
+                    from src.ai_handler import _get_inputs
+                    inputs = _get_inputs(ai_lane.dino, ai_lane.obstacles, ai_lane.game_speed)
+                    action = hybrid_ai.predict(inputs)
+                    ai_lane.update(action=action)
                 else:
                     ai_lane.update()
             else:
@@ -752,64 +818,68 @@ class GameManager:
 
         running = True
 
+        # Track keys đang được nhấn
+        p1_keys = {'jump': False, 'duck': False}
+        p2_keys = {'jump': False, 'duck': False}
+
         while running:
-            # Đọc phím liên tục để P2 (W/S) nhận input mượt hơn
+            # Đọc phím liên tục mỗi frame
             keys = pygame.key.get_pressed()
 
-            # Tạo action cho P1 (Space/Up/Down)
-            p1_action = None
+            # P1: W = Jump, S = Duck
             if not p1.game_over:
-                p1_jump = 1 if (keys[pygame.K_SPACE] or keys[pygame.K_UP]) else 0
-                p1_duck = 1 if keys[pygame.K_DOWN] else 0
-                p1_action = (p1_jump, p1_duck)
+                if keys[pygame.K_w]:
+                    if not p1_keys['jump']:
+                        p1.dino.jump_press()
+                        p1_keys['jump'] = True
+                else:
+                    if p1_keys['jump']:
+                        p1.dino.jump_release()
+                        p1_keys['jump'] = False
 
-            # Tạo action cho P2 (W/S)
-            p2_action = None
+                if keys[pygame.K_s]:
+                    p1.dino.duck(True)
+                    p1_keys['duck'] = True
+                else:
+                    if p1_keys['duck']:
+                        p1.dino.duck(False)
+                        p1_keys['duck'] = False
+
+            # P2: Up = Jump, Down = Duck
             if not p2.game_over:
-                p2_jump = 1 if keys[pygame.K_w] else 0
-                p2_duck = 1 if keys[pygame.K_s] else 0
-                p2_action = (p2_jump, p2_duck)
+                if keys[pygame.K_UP]:
+                    if not p2_keys['jump']:
+                        p2.dino.jump_press()
+                        p2_keys['jump'] = True
+                else:
+                    if p2_keys['jump']:
+                        p2.dino.jump_release()
+                        p2_keys['jump'] = False
+
+                if keys[pygame.K_DOWN]:
+                    p2.dino.duck(True)
+                    p2_keys['duck'] = True
+                else:
+                    if p2_keys['duck']:
+                        p2.dino.duck(False)
+                        p2_keys['duck'] = False
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                 if event.type == pygame.KEYDOWN:
-                    # P1 controls
-                    if event.key in (pygame.K_SPACE, pygame.K_UP):
-                        if not p1.game_over:
-                            p1.dino.jump_press()
-                    if event.key == pygame.K_DOWN:
-                        if not p1.game_over:
-                            p1.dino.duck(True)
-                    # P2 controls
-                    if event.key == pygame.K_w:
-                        if not p2.game_over:
-                            p2.dino.jump_press()
-                    if event.key == pygame.K_s:
-                        if not p2.game_over:
-                            p2.dino.duck(True)
                     # Game controls
                     if event.key == pygame.K_r:
                         p1.reset()
                         p2.reset()
+                        p1_keys = {'jump': False, 'duck': False}
+                        p2_keys = {'jump': False, 'duck': False}
                     if event.key == pygame.K_ESCAPE:
                         running = False
 
-                if event.type == pygame.KEYUP:
-                    # P1 release
-                    if event.key in (pygame.K_SPACE, pygame.K_UP):
-                        p1.dino.jump_release()
-                    if event.key == pygame.K_DOWN:
-                        p1.dino.duck(False)
-                    # P2 release
-                    if event.key == pygame.K_w:
-                        p2.dino.jump_release()
-                    if event.key == pygame.K_s:
-                        p2.dino.duck(False)
-
-            # Update cả hai lane - truyền action cho cả hai người chơi
-            p1.update(player_action=p1_action)
-            p2.update(player_action=p2_action)
+            # Update cả hai lane
+            p1.update()
+            p2.update()
 
             # Draw
             p1.draw()
@@ -829,10 +899,9 @@ class GameManager:
                 res = font_res.render(msg, True, col)
                 self.screen.blit(res, res.get_rect(center=(SCREEN_WIDTH // 2, LANE_H + 2)))
 
-            # Hiển thị hint khi có người game over
-            if p1.game_over or p2.game_over:
-                hint = font_hint.render('R - Retry  |  ESC - Menu', True, (220, 220, 220))
-                self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, LANE_H * 2 + 4 - 12)))
+            # Hiển thị hint điều khiển
+            hint = font_hint.render('P1: W=Jump, S=Duck  |  P2: Up=Jump, Down=Duck  |  R=Retry  |  ESC=Menu', True, (220, 220, 220))
+            self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)))
 
             pygame.display.flip()
             self.clock.tick(FPS)

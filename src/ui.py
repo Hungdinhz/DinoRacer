@@ -42,7 +42,7 @@ class UILayer:
         btn_w, btn_h = 200, 50
         gap = 20
         self.items = ["Resume", "Restart", "Quit"]
-        self._caculate_pause_menu_positions(btn_w, btn_h, gap)
+        self._calculate_pause_menu_positions(btn_w, btn_h, gap)
 
         self.ground_offset = 0
         self.bg_offset = 0
@@ -52,7 +52,7 @@ class UILayer:
         self.go_flash_timer = 0
         self.bg_index = 1
 
-    def _caculate_pause_menu_positions(self, btn_w, btn_h, gap):
+    def _calculate_pause_menu_positions(self, btn_w, btn_h, gap):
         """Tính vị trí các nút trong menu Pause"""
         cx = SCREEN_WIDTH // 2
         total_h = len(self.items) * btn_h + (len(self.items) - 1) * gap

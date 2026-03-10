@@ -3,6 +3,11 @@ Achievements System - Hệ thống thành tựu trong game
 """
 import json
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Định nghĩa các thành tựu
 ACHIEVEMENTS = {
@@ -124,7 +129,8 @@ ACHIEVEMENTS = {
 
 def get_achievements_file():
     """Lấy đường dẫn file achievements"""
-    return os.path.join(os.path.dirname(__file__), '..', 'achievements.json')
+    from pathlib import Path
+    return str(Path(__file__).parent.parent / 'achievements.json')
 
 
 class Achievements:
@@ -144,8 +150,8 @@ class Achievements:
                     data = json.load(f)
                     self.achievements = data.get('achievements', {})
                     self.unlocked = set(data.get('unlocked', []))
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error loading achievements: {e}")
     
     def save(self):
         """Lưu achievements vào file"""
@@ -156,8 +162,8 @@ class Achievements:
                     'achievements': self.achievements,
                     'unlocked': list(self.unlocked)
                 }, f, indent=2)
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error saving achievements: {e}")
     
     def unlock(self, achievement_id):
         """Mở khóa thành tựu"""

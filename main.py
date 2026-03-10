@@ -13,6 +13,8 @@ from src.ai_handler import (
     load_genome,
 )
 from src.assets_loader import clear_sheet_cache
+from src.utils import get_cached_font
+from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
 
 # Load environment variables from .env file
 load_dotenv()
@@ -108,19 +110,12 @@ def main():
             game.run_human_mode()
 
         elif choice == 'PVE(VS AI)':
-            # Hoi nguoi choi chon loai AI
-            # print("\nChon loai AI:")
-            # print("1. NEAT (khuyen nghi - da duoc train)")
-            # print("2. Supervised (can train tu PVP truoc)")
-            # ai_choice = input("Nhap lua chon (1-2): ").strip()
-
-            # ai_type = 'neat'
-            # if ai_choice == '2':
-            #     ai_type = 'supervised'
-
-            # game = GameManager(screen)
-            # game.run_pve_mode(ai_type=ai_type)
-            game.run_human_mode()
+            # Hien thi menu chon loai AI trong game
+            ai_type = select_ai_type(screen)
+            if ai_type:
+                print(f"Dang khoi tao AI: {ai_type}")
+                game = GameManager(screen)
+                game.run_pve_mode(ai_type=ai_type)
 
         elif choice == 'PVP(VS PLAYER)':
             game = GameManager(screen)
@@ -176,6 +171,71 @@ def main():
 
     pygame.quit()
     sys.exit()
+
+def select_ai_type(screen):
+    """Hiển thị menu chọn loại AI trong game"""
+    ai_options = ["NEAT AI", "Supervised AI", "Hybrid AI"]
+    selected = 0
+    btn_width, btn_height = 300, 60
+    gap = 15
+
+    font_title = get_cached_font('impact', 50)
+    font_item = get_cached_font('Arial', 28, bold=True)
+
+    clock = pygame.time.Clock()
+
+    while True:
+        screen.fill((20, 20, 30))
+
+        # Title
+        title = font_title.render("Select AI Opponent", True, (255, 215, 0))
+        screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 80))
+
+        # Calculate positions
+        total_h = len(ai_options) * btn_height + (len(ai_options) - 1) * gap
+        start_y = SCREEN_HEIGHT//2 - total_h//2
+
+        for i, option in enumerate(ai_options):
+            cx = SCREEN_WIDTH // 2
+            y = start_y + i * (btn_height + gap)
+            rect = pygame.Rect(cx - btn_width//2, y, btn_width, btn_height)
+
+            color = (255, 215, 0) if i == selected else (100, 100, 100)
+            pygame.draw.rect(screen, color, rect, 3, border_radius=10)
+
+            if i == selected:
+                pygame.draw.rect(screen, (255, 215, 0), rect, 3, border_radius=10)
+
+            text = font_item.render(option, True, color)
+            screen.blit(text, (cx - text.get_width()//2, y + btn_height//2 - text.get_height()//2))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(ai_options)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(ai_options)
+                elif event.key == pygame.K_RETURN:
+                    ai_types = ['neat', 'supervised', 'hybrid']
+                    return ai_types[selected]
+                elif event.key == pygame.K_ESCAPE:
+                    return None
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    for i in range(len(ai_options)):
+                        y = start_y + i * (btn_height + gap)
+                        rect = pygame.Rect(SCREEN_WIDTH//2 - btn_width//2, y, btn_width, btn_height)
+                        if rect.collidepoint(mouse_pos):
+                            ai_types = ['neat', 'supervised', 'hybrid']
+                            return ai_types[i]
+
+        clock.tick(60)
+
 
 if __name__ == "__main__":
     main()
