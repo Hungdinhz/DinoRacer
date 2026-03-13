@@ -4,6 +4,7 @@ Game Manager - Quản lý vòng lặp game, tính điểm, va chạm
 import pygame
 import random
 import math
+import  time
 
 # Cache cho AI models - tránh load lai nhieu lan
 _AI_CACHE = {
@@ -25,10 +26,11 @@ from config.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y,
     INITIAL_SCORE, SPEED_INCREASE_INTERVAL, SPEED_INCREASE_AMOUNT,
     MIN_OBSTACLE_SPAWN_DISTANCE, OBSTACLE_SPEED_MIN, OBSTACLE_SPEED_MAX,
-    COLLISION_MARGIN,
+    COLLISION_MARGIN, COIN_HEIGHT, COIN_WIDTH
 )
 from src.dino import Dino
 from src.obstacle import create_obstacle
+from src.items import Coin
 from src.highscore import load_highscore, save_highscore
 from src.assets_loader import play_sound, load_image, CLOUD_POSITIONS
 from src.achievements import check_achievements
@@ -81,6 +83,7 @@ class Particle:
         self.max_life = self.life
         self.size = random.randint(4, 10)
         self.color = random.choice(PARTICLE_COLORS)
+    
 
     def update(self):
         self.x += self.vx
@@ -206,6 +209,7 @@ class GameManager:
         self._dust_spawn_timer = 0  # Timer để spawn bụi
         self.go_flash_timer = 0
         self.bg_index = 1
+        self.last_coin_x = 0  # Cache vị trí coin cuối cùng để spawn hợp lý
 
         # UILayer để vẽ 
         self.ui = UILayer(screen)
@@ -224,6 +228,7 @@ class GameManager:
         skin = getattr(game_settings, 'skin_dino', 'dino') if not self.is_ai_mode else 'ai_dino'
         self.dino = Dino(folder=skin)
         self.obstacles = []
+        self.items = []
         self.score = INITIAL_SCORE
         self.game_speed = OBSTACLE_SPEED_MIN
         self.last_obstacle_x = 0
@@ -236,6 +241,7 @@ class GameManager:
         self._dust_spawn_timer = 0
         self.go_flash_timer = 0
         self.bg_index = 1
+
         # Achievement popup state
         self.pending_achievements = []
         self.ach_popup_timer = 0
@@ -249,25 +255,25 @@ class GameManager:
         self.paused = not self.paused
 
     def spawn_obstacle(self):
-        # Lấy khoảng cách mục tiêu, nếu chưa có thì lấy số mặc định là 400
-        target_distance = getattr(self, 'next_spawn_distance', 400)
+        # Lấy khoảng cách mục tiêu, nếu chưa có thì lấy số mặc định là 600
+        target_distance = getattr(self, 'next_spawn_distance', 600)
         
-        # Kiểm tra xem chướng ngại vật cuối cùng đã trôi vào đủ sâu chưa
-        if (SCREEN_WIDTH - self.last_obstacle_x) > target_distance:
+        # TÌM XU CỦA ĐỒNG XU CUỐI CÙNG (Nếu có)
+        last_coin_x = max([i.x for i in getattr(self, 'items', [])]) if getattr(self, 'items', []) else 0
+        dist_to_last_coin = (SCREEN_WIDTH + 50) - last_coin_x
+        
+        # KIỂM TRA: Đủ khoảng cách với cây cũ VÀ đủ khoảng cách với đồng xu mới nhất
+        if (SCREEN_WIDTH - self.last_obstacle_x) > target_distance and dist_to_last_coin > 150:
             speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
             
             # Khởi tạo chướng ngại vật mới ở tít ngoài mép phải màn hình
-            spawn_x = SCREEN_WIDTH + random.randint(50, 150)
+            spawn_x = SCREEN_WIDTH + 50
             obs = create_obstacle(spawn_x, speed)
             self.obstacles.append(obs)
             self.last_obstacle_x = obs.x
-            
-            # ==========================================
-            # BỐC THĂM KHOẢNG CÁCH CHO LẦN XUẤT HIỆN SAU
-            # ==========================================
-            # 300 là khoảng cách gần nhất (đủ để khủng long nhảy qua 2 cây)
-            # 700 là khoảng cách xa nhất (khoảng trống để người chơi thở)
-            self.next_spawn_distance = random.randint(300, 700)
+        
+            # Bốc thăm khoảng cách cho cây tiếp theo
+            self.next_spawn_distance = random.randint(500, 1000)
 
     def check_collision(self):
         # Early exit nếu không có obstacle
@@ -360,6 +366,45 @@ class GameManager:
         self.game_speed = OBSTACLE_SPEED_MIN + (self.score // SPEED_INCREASE_INTERVAL) * SPEED_INCREASE_AMOUNT
         self.game_speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
         self.bg_index = min(1 + self.score // 50, 5)
+
+        # 1. Sinh ra Coin ngẫu nhiên nếu đủ điều kiện
+        start_coin_x = SCREEN_WIDTH + 50
+        dist_to_last_obs = start_coin_x - self.last_obstacle_x
+
+        expected_next_obs_x = self.last_obstacle_x + getattr(self, 'next_spawn_distance', 500)
+        dist_to_next_obs = expected_next_obs_x - start_coin_x
+
+        self.last_coin_x = max(i.x for i in self.items) if self.items else 0
+        dist_to_last_coin = start_coin_x - self.last_coin_x
+
+        if (len(self.items) < 5 and random.random() < 0.03 and 
+            dist_to_last_obs > 250 and 
+            dist_to_next_obs > 250 and 
+            dist_to_last_coin > 350):
+                count_coins = random.randint(1, 4)
+                for i in range(count_coins):
+                    if len(self.items) < 5 :
+                        coin_x = start_coin_x + i * 50
+                        coin_speed = self.game_speed
+                        self.items.append(Coin(coin_x, coin_speed))
+
+        # 2. Cập nhật và kiểm tra ăn Coin
+        dino_rect = self.dino.get_rect()
+        for item in self.items:
+            
+            old_x = item.x
+            item.update()
+            actual_speed = item.speed * speed_mult
+            item.x = old_x - actual_speed
+            
+           
+            if dino_rect.colliderect(item.get_rect()) and not item.is_collected:
+                item.is_collected = True
+                self.score += item.bonus_points 
+                play_sound("score") # Phát tiếng Ting
+
+        # 3. Lọc bỏ các Coin đã bay ra khỏi màn hình hoặc ĐÃ BỊ ĂN
+        self.items = [i for i in self.items if not i.is_off_screen() and not i.is_collected]
 
         for c in self.clouds:
             c.update()
@@ -553,6 +598,14 @@ class GameManager:
         elif self.game_over:
             self.ui.draw_game_over()
         self._draw_achievement_popup()
+#<<<<<<< HEAD
+        pygame.draw.rect(self.screen, (0, 255, 0), self.dino.get_rect(), 2)
+        for obs in self.obstacles:
+            pygame.draw.rect(self.screen, (255, 0, 0), obs.get_rect(), 2)
+
+        for item in self.items:
+            item.draw(self.screen)
+
         pygame.display.flip()
 
     def run_human_mode(self):
@@ -758,8 +811,24 @@ class GameManager:
         from src.lane_game import LaneGame, LANE_H
         from src.utils import get_cached_font
 
-        p1 = LaneGame('dino',    'PLAYER 1', label_color=(255, 230, 80),   collect_data=True, player_type="human")
-        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255),  collect_data=True, player_type="ai")
+        # --- BƯỚC 1: TẠO MAP GIỐNG HỆT NHAU ---
+        # Tạo một hạt giống (seed) ngẫu nhiên cho ván đấu này
+        random.seed(time.time()) 
+        
+        # Lưu lại trạng thái của cỗ bài
+        shared_initial_state = random.getstate()
+
+        # Khởi tạo P1 (P1 sẽ rút vài lá bài để tạo mây)
+        p1 = LaneGame('dino', 'PLAYER 1', label_color=(255, 230, 80), collect_data=True, player_type="human")
+        p1_rand_state = random.getstate() # Cất cỗ bài của P1 đi
+
+        # Reset cỗ bài về trạng thái ban đầu cho P2
+        random.setstate(shared_initial_state)
+        
+        # Khởi tạo P2 (Lúc này P2 sẽ rút được các lá bài tạo mây GIỐNG HỆT P1)
+        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255), collect_data=True, player_type="ai")
+        p2_rand_state = random.getstate() # Cất cỗ bài của P2 đi
+        # ---------------------------------------
 
         div = pygame.Surface((SCREEN_WIDTH, 4))
         div.fill((255, 200, 50))
@@ -828,9 +897,19 @@ class GameManager:
                     if event.key == pygame.K_ESCAPE:
                         running = False
 
-            # Update cả hai lane
+           # --- BƯỚC 2: CẬP NHẬT TÁCH BIỆT "VŨ TRỤ" ---
+            
+            # Ép Python dùng cỗ bài của P1
+            random.setstate(p1_rand_state)
             p1.update()
+            p1_rand_state = random.getstate() # Lưu lại để frame sau P1 dùng tiếp
+
+            # Ép Python dùng cỗ bài của P2
+            random.setstate(p2_rand_state)
             p2.update()
+            p2_rand_state = random.getstate() # Lưu lại để frame sau P2 dùng tiếp
+
+            # --- KẾT THÚC BƯỚC 2 ---
 
             # Draw
             p1.draw()

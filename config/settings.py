@@ -16,7 +16,7 @@ CACTUS_COLOR = (0, 128, 0)
 BIRD_COLOR = (100, 100, 200)
 
 # Mặt đất - Điều chỉnh theo màn hình mới
-GROUND_Y = 550
+GROUND_Y = 600
 
 # Dino
 DINO_X = 100
@@ -49,6 +49,10 @@ CACTUS_HEIGHT_LARGE = 90
 # Chướng ngại vật - Bird
 BIRD_WIDTH = 70
 BIRD_HEIGHT = 45
+
+# Vật phẩm(Item) - Coin
+COIN_WIDTH = 40
+COIN_HEIGHT = 40
 
 # Tốc độ chướng ngại vật - Điều chỉnh cho màn hình lớn hơn
 OBSTACLE_SPEED_MIN = 7
@@ -96,7 +100,7 @@ AI_DIFFICULTY_MULTIPLIERS = {
 }
 
 # Lane game
-LANE_HEIGHT = 250
+LANE_HEIGHT = 360
 GROUND_Y_LANE = LANE_HEIGHT - 55
 
 # Collision
