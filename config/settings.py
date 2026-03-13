@@ -5,7 +5,7 @@ Settings - Cấu hình toàn bộ game DinoRacer
 # Màn hình - Tăng kích thước để chơi thoải mái hơn
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
-FPS = 60
+FPS = 120  # Tăng FPS cho PVP mượt hơn
 
 # Màu sắc
 BG_COLOR = (247, 247, 247)
@@ -55,8 +55,8 @@ COIN_WIDTH = 40
 COIN_HEIGHT = 40
 
 # Tốc độ chướng ngại vật - Điều chỉnh cho màn hình lớn hơn
-OBSTACLE_SPEED_MIN = 7
-OBSTACLE_SPEED_MAX = 20
+OBSTACLE_SPEED_MIN = 5  # Giảm tốc độ ban đầu để dễ chơi hơn
+OBSTACLE_SPEED_MAX = 15  # Giảm tốc độ tối đa
 
 # Khoảng cách spawn tối thiểu - Tăng lên cho màn hình rộng hơn
 MIN_OBSTACLE_SPAWN_DISTANCE = 350

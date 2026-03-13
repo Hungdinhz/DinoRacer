@@ -813,27 +813,27 @@ class GameManager:
 
         # --- BƯỚC 1: TẠO MAP GIỐNG HỆT NHAU ---
         # Tạo một hạt giống (seed) ngẫu nhiên cho ván đấu này
-        random.seed(time.time()) 
-        
+        random.seed(time.time())
+
         # Lưu lại trạng thái của cỗ bài
         shared_initial_state = random.getstate()
 
         # Khởi tạo P1 (P1 sẽ rút vài lá bài để tạo mây)
-        p1 = LaneGame('dino', 'PLAYER 1', label_color=(255, 230, 80), collect_data=True, player_type="human")
-        p1_rand_state = random.getstate() # Cất cỗ bài của P1 đi
+        p1 = LaneGame('dino', 'PLAYER 1', label_color=(255, 230, 80), collect_data=False, player_type="human")  # Tắt data collection để tăng FPS
+        p1_rand_state = random.getstate()  # Cất cỗ bài của P1 đi
 
         # Reset cỗ bài về trạng thái ban đầu cho P2
         random.setstate(shared_initial_state)
-        
+
         # Khởi tạo P2 (Lúc này P2 sẽ rút được các lá bài tạo mây GIỐNG HỆT P1)
-        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255), collect_data=True, player_type="ai")
-        p2_rand_state = random.getstate() # Cất cỗ bài của P2 đi
+        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255), collect_data=False, player_type="ai")  # Tắt data collection để tăng FPS
+        p2_rand_state = random.getstate()  # Cất cỗ bài của P2 đi
         # ---------------------------------------
 
         div = pygame.Surface((SCREEN_WIDTH, 4))
         div.fill((255, 200, 50))
 
-        font_res  = get_cached_font('Arial', 22, bold=True)
+        font_res = get_cached_font('Arial', 22, bold=True)
         font_hint = get_cached_font('Arial', 16)
 
         running = True
@@ -842,11 +842,16 @@ class GameManager:
         p1_keys = {'jump': False, 'duck': False}
         p2_keys = {'jump': False, 'duck': False}
 
+        # Cache surfaces để không vẽ lại khi đã game over
+        p1_surface_cache = None
+        p2_surface_cache = None
+        both_game_over_drawn = False
+
         while running:
             # Đọc phím liên tục mỗi frame
             keys = pygame.key.get_pressed()
 
-            # P1: W = Jump, S = Duck
+            # P1: W = Jump, S = Duck (chỉ xử lý nếu chưa game over)
             if not p1.game_over:
                 if keys[pygame.K_w]:
                     if not p1_keys['jump']:
@@ -865,7 +870,7 @@ class GameManager:
                         p1.dino.duck(False)
                         p1_keys['duck'] = False
 
-            # P2: Up = Jump, Down = Duck
+            # P2: Up = Jump, Down = Duck (chỉ xử lý nếu chưa game over)
             if not p2.game_over:
                 if keys[pygame.K_UP]:
                     if not p2_keys['jump']:
@@ -894,44 +899,79 @@ class GameManager:
                         p2.reset()
                         p1_keys = {'jump': False, 'duck': False}
                         p2_keys = {'jump': False, 'duck': False}
+                        p1_surface_cache = None
+                        p2_surface_cache = None
+                        both_game_over_drawn = False
                     if event.key == pygame.K_ESCAPE:
                         running = False
 
-           # --- BƯỚC 2: CẬP NHẬT TÁCH BIỆT "VŨ TRỤ" ---
-            
-            # Ép Python dùng cỗ bài của P1
-            random.setstate(p1_rand_state)
-            p1.update()
-            p1_rand_state = random.getstate() # Lưu lại để frame sau P1 dùng tiếp
+            # --- BƯỚC 2: CẬP NHẬT TÁCH BIỆT "VŨ TRỤ" ---
 
-            # Ép Python dùng cỗ bài của P2
-            random.setstate(p2_rand_state)
-            p2.update()
-            p2_rand_state = random.getstate() # Lưu lại để frame sau P2 dùng tiếp
+            # Chỉ update P1 nếu chưa game over
+            if not p1.game_over:
+                random.setstate(p1_rand_state)
+                p1.update()
+                p1_rand_state = random.getstate()
+            else:
+                # P1 đã chết, vẽ lại surface cuối cùng và cache lại
+                if p1_surface_cache is None:
+                    p1.draw()
+                    p1_surface_cache = p1.surface.copy()
+
+            # Chỉ update P2 nếu chưa game over
+            if not p2.game_over:
+                random.setstate(p2_rand_state)
+                p2.update()
+                p2_rand_state = random.getstate()
+            else:
+                # P2 đã chết, vẽ lại surface cuối cùng và cache lại
+                if p2_surface_cache is None:
+                    p2.draw()
+                    p2_surface_cache = p2.surface.copy()
 
             # --- KẾT THÚC BƯỚC 2 ---
 
-            # Draw
-            p1.draw()
-            p2.draw()
-            self.screen.blit(p1.surface, (0, 0))
+            # Draw - sử dụng cache nếu đã game over
+            if p1_surface_cache is not None:
+                self.screen.blit(p1_surface_cache, (0, 0))
+            else:
+                p1.draw()
+                self.screen.blit(p1.surface, (0, 0))
+
             self.screen.blit(div, (0, LANE_H))
-            self.screen.blit(p2.surface, (0, LANE_H + 4))
+
+            if p2_surface_cache is not None:
+                self.screen.blit(p2_surface_cache, (0, LANE_H + 4))
+            else:
+                p2.draw()
+                self.screen.blit(p2.surface, (0, LANE_H + 4))
 
             # Hiển thị kết quả khi cả hai game over
             if p1.game_over and p2.game_over:
-                if p1.score > p2.score:
-                    msg, col = f'P1 THẮNG! ({p1.score} vs {p2.score})', (255, 230, 80)
-                elif p2.score > p1.score:
-                    msg, col = f'P2 THẮNG! ({p2.score} vs {p1.score})', (200, 150, 255)
+                if not both_game_over_drawn:
+                    if p1.score > p2.score:
+                        msg, col = f'P1 THẮNG! ({p1.score} vs {p2.score})', (255, 230, 80)
+                    elif p2.score > p1.score:
+                        msg, col = f'P2 THẮNG! ({p2.score} vs {p1.score})', (200, 150, 255)
+                    else:
+                        msg, col = f'HÒA! ({p1.score})', (200, 200, 200)
+                    res = font_res.render(msg, True, col)
+                    self.screen.blit(res, res.get_rect(center=(SCREEN_WIDTH // 2, LANE_H + 2)))
+                    both_game_over_drawn = True
                 else:
-                    msg, col = f'HÒA! ({p1.score})', (200, 200, 200)
-                res = font_res.render(msg, True, col)
-                self.screen.blit(res, res.get_rect(center=(SCREEN_WIDTH // 2, LANE_H + 2)))
+                    # Vẽ lại kết quả đã cache
+                    if p1.score > p2.score:
+                        msg, col = f'P1 THẮNG! ({p1.score} vs {p2.score})', (255, 230, 80)
+                    elif p2.score > p1.score:
+                        msg, col = f'P2 THẮNG! ({p2.score} vs {p1.score})', (200, 150, 255)
+                    else:
+                        msg, col = f'HÒA! ({p1.score})', (200, 200, 200)
+                    res = font_res.render(msg, True, col)
+                    self.screen.blit(res, res.get_rect(center=(SCREEN_WIDTH // 2, LANE_H + 2)))
 
             # Hiển thị hint điều khiển
             hint = font_hint.render('P1: W=Jump, S=Duck  |  P2: Up=Jump, Down=Duck  |  R=Retry  |  ESC=Menu', True, (220, 220, 220))
             self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)))
 
             pygame.display.flip()
-            self.clock.tick(FPS)
+            self.clock.tick(120)  # PVP mode chạy 120 FPS mượt hơn
