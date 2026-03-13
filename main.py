@@ -104,10 +104,19 @@ def main():
         menu = Menu(screen)
         choice = menu.run()
 
-        if choice == 'Solo':
+        if choice == 'Classic':
             # Chế độ chơi thường một mình - Sử dụng GameManager với human mode
             game = GameManager(screen, is_ai_mode=False)
             game.run_human_mode()
+
+        elif choice == 'Time Attack':
+            from src.time_attack import run_time_attack
+            difficulty = settings.difficulty
+            run_time_attack(screen, difficulty=difficulty)
+
+        elif choice == 'Endless':
+            from src.endless import run_endless
+            run_endless(screen)
 
         elif choice == 'PVE(VS AI)':
             # Hien thi menu chon loai AI trong game
@@ -120,15 +129,6 @@ def main():
         elif choice == 'PVP(VS PLAYER)':
             game = GameManager(screen)
             game.run_pvp_mode()
-
-        elif choice == 'Time Attack':
-            from src.time_attack import run_time_attack
-            difficulty = settings.difficulty
-            run_time_attack(screen, difficulty=difficulty)
-            
-        elif choice == 'Endless':
-            from src.endless import run_endless
-            run_endless(screen)
             
         elif choice == 'NEAT Training' or choice == 'Train AI':
             print("Bắt đầu NEAT Visual Training... (ESC để dừng, S để skip gen)")

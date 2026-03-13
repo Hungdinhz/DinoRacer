@@ -3,7 +3,9 @@
     "allow": [
       "Bash(python:*)",
       "Bash(timeout:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(git pull:*)",
+      "Bash(git:*)"
     ]
   }
 }

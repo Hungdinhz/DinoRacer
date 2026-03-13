@@ -61,6 +61,7 @@ MENU_SETTINGS = "settings"
 MENU_STATS = "stats"
 MENU_ACHIEVEMENTS = "achievements"
 MENU_TRAIN_AI = "train_ai"
+MENU_SOLO = "solo"  # Submenu cho Solo
 
 class Particle:
     def __init__(self):
@@ -155,8 +156,8 @@ class Menu:
         self.font_small = get_cached_font('Arial', 20)
         self.font_hint = get_cached_font('Arial', 16)
 
-        # Menu items - Updated: Added Solo mode
-        self.main_items = ["Solo", "PVE(VS AI)", "PVP(VS PLAYER)", "Time Attack", "Endless", "Achievements", "Stats", "Train AI", "Settings", "Quit"]
+        # Menu items - Solo now includes Time Attack and Endless
+        self.main_items = ["Solo", "PVE(VS AI)", "PVP(VS PLAYER)", "Achievements", "Stats", "Train AI", "Settings", "Quit"]
         self.settings_items = ["Sound: ON", "Music: ON", "Data Collection: ON", "Difficulty: Normal", "AI Level: Medium", "Back"]
 
         self.selected = 0
@@ -404,6 +405,45 @@ class Menu:
 
         pygame.display.flip()
 
+    def draw_solo_menu(self):
+        """Submenu cho Solo mode - chọn chế độ chơi"""
+        self.draw_background()
+        self.draw_title_with_shadow("SELECT MODE", 80)
+
+        sw, sh = self._get_screen_dims()
+        desc_lines = [
+            "Chọn chế độ chơi:",
+            "",
+            "Classic: Chơi thường - nhảy qua chướng ngại",
+            "Time Attack: Giới hạn thời gian - ghi điểm cao nhất trong thời gian quy định",
+            "Endless: Chơi vô hạn - chạy đến khi nào thua",
+        ]
+        y = 160
+        for line in desc_lines:
+            s = self.font_small.render(line, True, (200, 200, 200))
+            self.screen.blit(s, (sw // 2 - s.get_width() // 2, y))
+            y += 28
+
+        items = ["Classic", "Time Attack", "Endless", "Back"]
+        btn_w, btn_h, gap = 320, 55, 18
+        total_h = len(items) * (btn_h + gap)
+        start_y = sh // 2 + 30
+        self.button_rects = []
+        for i, item in enumerate(items):
+            rect = pygame.Rect(0, 0, btn_w, btn_h)
+            rect.center = (sw // 2, start_y + i * (btn_h + gap))
+            self.button_rects.append(rect)
+
+        mouse_pos = pygame.mouse.get_pos()
+        for i, button_data in enumerate(self.button_rects):
+            rect = button_data if not isinstance(button_data, tuple) else button_data[1]
+            item = items[i] if i < len(items) else ""
+            if rect.collidepoint(mouse_pos):
+                self.selected = i
+            self.draw_button(item, rect, i == self.selected)
+
+        pygame.display.flip()
+
     def draw_train_ai_menu(self):
         """Submenu chọn loại Training AI"""
         self.draw_background()
@@ -599,6 +639,9 @@ class Menu:
         elif self.current_menu == MENU_TRAIN_AI:
             self.draw_train_ai_menu()
             return
+        elif self.current_menu == MENU_SOLO:
+            self.draw_solo_menu()
+            return
 
         # Main menu
         self.draw_title_with_shadow("DINO RACER", 100)
@@ -741,6 +784,34 @@ class Menu:
                             self.selected = (self.selected + 1) % len(train_items)
                     continue
 
+                if self.current_menu == MENU_SOLO:
+                    solo_items = ["Classic", "Time Attack", "Endless", "Back"]
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        mouse_pos = pygame.mouse.get_pos()
+                        for i, button_data in enumerate(self.button_rects):
+                            rect = button_data if not isinstance(button_data, tuple) else button_data[1]
+                            if rect.collidepoint(mouse_pos):
+                                if solo_items[i] == "Back":
+                                    self.current_menu = MENU_MAIN
+                                    self.selected = 0
+                                else:
+                                    return solo_items[i]
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            self.current_menu = MENU_MAIN
+                            self.selected = 0
+                        elif event.key == pygame.K_RETURN:
+                            if self.selected < len(solo_items) - 1:
+                                return solo_items[self.selected]
+                            else:
+                                self.current_menu = MENU_MAIN
+                                self.selected = 0
+                        elif event.key == pygame.K_UP:
+                            self.selected = (self.selected - 1) % len(solo_items)
+                        elif event.key == pygame.K_DOWN:
+                            self.selected = (self.selected + 1) % len(solo_items)
+                    continue
+
                 # Main menu handling
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:
@@ -768,6 +839,9 @@ class Menu:
                                     self.selected = 0
                                 elif choice == "Train AI":
                                     self.current_menu = MENU_TRAIN_AI
+                                    self.selected = 0
+                                elif choice == "Solo":
+                                    self.current_menu = MENU_SOLO
                                     self.selected = 0
                                 else:
                                     return choice
@@ -816,6 +890,9 @@ class Menu:
                             self.selected = 0
                         elif choice == "Train AI":
                             self.current_menu = MENU_TRAIN_AI
+                            self.selected = 0
+                        elif choice == "Solo":
+                            self.current_menu = MENU_SOLO
                             self.selected = 0
                         else:
                             return choice
