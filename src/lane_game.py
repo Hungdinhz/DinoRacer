@@ -15,6 +15,7 @@ from src.obstacle import create_obstacle
 from src.assets_loader import play_sound, load_image
 from src.data_collector import get_collector
 from src.utils import get_cached_font
+from src.ui import UILayer
 
 # Chiều cao mỗi lane
 LANE_H = LANE_HEIGHT
@@ -100,6 +101,8 @@ class LaneGame:
         self.player_type = player_type
 
         self.surface = pygame.Surface((LANE_W, LANE_H))
+
+        self.ui = UILayer(self.surface)
 
         # Sử dụng cached fonts thay vì tạo mới
         self.font_hud   = get_cached_font("Arial", 20, bold=True)

@@ -596,7 +596,7 @@ class GameManager:
             # self._draw_paused_overlay()
             self.ui.draw_pause_menu()
         elif self.game_over:
-            self.ui.draw_game_over()
+            self.ui.draw_game_over(self.score)
         self._draw_achievement_popup()
 #<<<<<<< HEAD
         pygame.draw.rect(self.screen, (0, 255, 0), self.dino.get_rect(), 2)
