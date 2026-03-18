@@ -150,13 +150,24 @@ class Menu:
         available_fonts = pygame.font.get_fonts()
         title_font_name = 'impact' if 'impact' in available_fonts else 'arial'
 
-        self.font_title = get_cached_font(title_font_name, 80)
-        self.font_item = get_cached_font('Arial', 32, bold=True)
-        self.font_small = get_cached_font('Arial', 20)
-        self.font_hint = get_cached_font('Arial', 16)
+        font_path = 'assets/fonts/font_vn.ttf' 
+
+        try:
+            # Ưu tiên load thẳng file font để đảm bảo có tiếng Việt
+            self.font_title = pygame.font.Font(font_path, 80)
+            self.font_item = pygame.font.Font(font_path, 32)
+            self.font_small = pygame.font.Font(font_path, 20)
+            self.font_hint = pygame.font.Font(font_path, 16)
+        except:
+            # Nếu không tìm thấy file, xài tạm font mặc định (như cũ)
+            self.font_title = get_cached_font('impact', 80)
+            self.font_item = get_cached_font('Arial', 32, bold=True)
+            self.font_small = get_cached_font('Arial', 20)
+            self.font_hint = get_cached_font('Arial', 16)
+            print("Chưa tìm thấy file font_vn.ttf trong thư mục assets!")
 
         # Menu items - Solo now includes Time Attack and Endless
-        self.main_items = ["Solo", "PVE(VS AI)", "PVP(VS PLAYER)", "Stats", "Train AI", "Settings"]
+        self.main_items = ["Solo", "PVE(VS AI)", "PVP(VS PLAYER)", "Stats", "Train AI"]
         self.settings_items = ["Sound: ON", "Music: ON", "Data Collection: ON", "Difficulty: Normal", "AI Level: Medium", "Back"]
 
         self.selected = 0
@@ -178,6 +189,17 @@ class Menu:
 
         self.button_rects = []
         self._calculate_button_positions()
+        # --- Load Gear Icon ---
+        try:
+            # Nhớ đảm bảo bạn có file gear.png trong thư mục assets
+            self.gear_icon = pygame.image.load('assets/images/gear.png').convert_alpha()
+            self.gear_icon = pygame.transform.scale(self.gear_icon, (100, 100))
+        except:
+            # Cứu cánh: Nếu chưa có file ảnh, tạm vẽ một ô vuông màu xám
+            self.gear_icon = pygame.Surface((100, 100), pygame.SRCALPHA)
+            pygame.draw.circle(self.gear_icon, (200, 200, 200, 150), (50, 50), 50)
+        
+        self.gear_rect = self.gear_icon.get_rect()
 
     def _calculate_button_positions(self):
         if self.current_menu == MENU_MAIN:
@@ -292,7 +314,17 @@ class Menu:
     def draw_settings_menu(self):
         self.draw_background()
         self.draw_title_with_shadow("SETTINGS", 80)
-
+        # === THÊM ĐOẠN VẼ MŨI TÊN BACK ===
+        mouse_pos = pygame.mouse.get_pos()
+        self.back_arrow_rect = pygame.Rect(20, 20, 60, 40)
+        
+        # Đổi màu thành Vàng nếu trỏ chuột vào, bình thường màu Xám sáng
+        arrow_color = (255, 215, 0) if self.back_arrow_rect.collidepoint(mouse_pos) else (200, 200, 200)
+        
+        # Vẽ hình mũi tên (toạ độ các đỉnh của đa giác)
+        points = [(20, 40), (40, 25), (40, 35), (70, 35), (70, 45), (40, 45), (40, 55)]
+        pygame.draw.polygon(self.screen, arrow_color, points)
+        # =================================
         # Danh sách skin có sẵn
         SKINS = ['dino', 'dino2', 'dino3']
         skin_label = settings.skin_dino.upper()
@@ -570,7 +602,15 @@ class Menu:
         self.draw_title_with_shadow("DINO RACER", 100)
 
         mouse_pos = pygame.mouse.get_pos()
-
+        # --- VẼ ICON BÁNH RĂNG ---
+        sw, sh = self._get_screen_dims()
+        self.gear_rect.topright = (sw - 25, 25) # Cách góc phải trên 20px
+        self.screen.blit(self.gear_icon, self.gear_rect)
+        
+        # Vẽ viền sáng lên khi di chuột vào bánh răng
+        if self.gear_rect.collidepoint(mouse_pos):
+            pygame.draw.rect(self.screen, (255, 215, 0), self.gear_rect, 2, border_radius=35)
+        # -------------------------
         # Vẽ buttons với hỗ trợ scroll
         for item_idx, rect in self.button_rects:
             if item_idx < len(self.main_items):
@@ -640,6 +680,13 @@ class Menu:
                     # Also handle mouse click in settings
                     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                         mouse_pos = pygame.mouse.get_pos()
+                        # === THÊM ĐOẠN BẮT CLICK MŨI TÊN ===
+                        if hasattr(self, 'back_arrow_rect') and self.back_arrow_rect.collidepoint(mouse_pos):
+                            self.current_menu = MENU_MAIN
+                            self.selected = 0
+                            self._calculate_button_positions()
+                            continue  # Thoát ra Main Menu lập tức
+                        # ===================================
                         for i, button_data in enumerate(self.button_rects):
                             rect = button_data if not isinstance(button_data, tuple) else button_data[1]
                             if rect.collidepoint(mouse_pos):
@@ -724,6 +771,13 @@ class Menu:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:
                         mouse_pos = pygame.mouse.get_pos()
+                        # --- KIỂM TRA CLICK BÁNH RĂNG ---
+                        if self.gear_rect.collidepoint(mouse_pos):
+                            self.current_menu = MENU_SETTINGS
+                            self.selected = 0
+                            self._calculate_button_positions()
+                            continue
+                        # --------------------------------
                         for button_data in self.button_rects:
                             # Handle both tuple (item_idx, rect) and just rect
                             if isinstance(button_data, tuple):
