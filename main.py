@@ -165,10 +165,6 @@ def main():
             except Exception as e:
                 print(f"Lỗi Supervised Training: {e}")
 
-        elif choice == 'Quit':
-            # 3. Chỉ thoát Pygame khi người dùng chọn Quit từ Menu
-            break
-
     pygame.quit()
     sys.exit()
 
