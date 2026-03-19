@@ -475,38 +475,6 @@ class GameManager:
 
     # ── Draw ──────────────────────────────────────────────────
 
-    def _draw_background(self):
-        bg = _get_bg(self.bg_index)
-        ox = int(self.bg_offset) % SCREEN_WIDTH
-        self.screen.blit(bg, (-ox, 0))
-        if ox > 0:
-            self.screen.blit(bg, (SCREEN_WIDTH - ox, 0))
-        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        # (255, 255, 255, 70) là màu trắng với độ mờ 70/255. 
-        # Nếu bạn muốn không gian u ám/tối hơn, hãy đổi thành màu đen: (0, 0, 0, 80)
-        overlay.fill((255, 255, 255, 100)) 
-        self.screen.blit(overlay, (0, 0))
-
-    def _draw_ground(self):
-        tile_h = SCREEN_HEIGHT - GROUND_Y
-        tile_w = 64
-        y_offset = 30
-        # Sử dụng cached tile
-        tile = _get_cached_tile("Tile_02.png", (tile_w, tile_h))
-        if tile:
-            offset = int(self.ground_offset) % tile_w
-            for x in range(-tile_w, SCREEN_WIDTH + tile_w, tile_w):
-                self.screen.blit(tile, (x - offset, GROUND_Y- y_offset))
-        else:
-            pygame.draw.rect(self.screen, GROUND_COL,
-                             (0, GROUND_Y, SCREEN_WIDTH, tile_h))
-            pygame.draw.line(self.screen, GROUND_LINE,
-                             (0, GROUND_Y), (SCREEN_WIDTH, GROUND_Y), 3)
-            for i in range(-1, SCREEN_WIDTH // 40 + 2):
-                x = i * 40 - int(self.ground_offset) % 40
-                pygame.draw.line(self.screen, GROUND_LINE,
-                                 (x, GROUND_Y + 10), (x + 22, GROUND_Y + 10), 1)
-
     def _draw_hud(self):
         h = max(self.highscore_ai if self.is_ai_mode else self.highscore_human, self.score)
 
@@ -528,25 +496,6 @@ class GameManager:
         bar_color = (int(80 + 175 * ratio), int(200 - 150 * ratio), 50)
         pygame.draw.rect(self.screen, bar_color,
                          (bar_x, bar_y, fill_w, bar_h), border_radius=4)
-
-    def _draw_pause_btn(self):
-        mouse_pos = pygame.mouse.get_pos()
-        hover = self.pause_btn.collidepoint(mouse_pos)
-        color = (180, 180, 180) if hover else (80, 80, 80)
-        pygame.draw.rect(self.screen, color, self.pause_btn, border_radius=8)
-        pygame.draw.rect(self.screen, (220, 220, 220), self.pause_btn, 2, border_radius=8)
-        if self.paused:
-            pygame.draw.polygon(self.screen, TEXT_LIGHT, [
-                (self.pause_btn.left + 14, self.pause_btn.top + 11),
-                (self.pause_btn.left + 14, self.pause_btn.bottom - 11),
-                (self.pause_btn.right - 10, self.pause_btn.centery),
-            ])
-        else:
-            pygame.draw.rect(self.screen, TEXT_LIGHT,
-                             (self.pause_btn.left + 11, self.pause_btn.top + 11, 9, 28))
-            pygame.draw.rect(self.screen, TEXT_LIGHT,
-                             (self.pause_btn.left + 30, self.pause_btn.top + 11, 9, 28))
-
     
     def _draw_achievement_popup(self):
         """Vẽ popup thành tựu mới mở khóa - slide in từ phải sang."""
@@ -578,10 +527,10 @@ class GameManager:
         self.screen.blit(name_surf, (px + 8, py + 32))
 
     def draw(self):
-        self._draw_background()
+        self.ui._draw_background(self.bg_offset)
         for c in self.clouds:
             c.draw(self.screen)
-        self._draw_ground()
+        self.ui._draw_ground(self.ground_offset)
 
         # Vẽ dust particles TRƯỚC dino (để dino đè lên)
         for p in self.dust_particles:
@@ -591,14 +540,15 @@ class GameManager:
         for obs in self.obstacles:
             obs.draw(self.screen)
         self._draw_hud()
-        self._draw_pause_btn()
+        #self._draw_pause_btn()
+        self.ui._draw_pause_btn(self.paused)
         if self.paused:
             # self._draw_paused_overlay()
             self.ui.draw_pause_menu()
         elif self.game_over:
             self.ui.draw_game_over(self.score)
         self._draw_achievement_popup()
-#<<<<<<< HEAD
+        
         pygame.draw.rect(self.screen, (0, 255, 0), self.dino.get_rect(), 2)
         for obs in self.obstacles:
             pygame.draw.rect(self.screen, (255, 0, 0), obs.get_rect(), 2)
@@ -660,7 +610,7 @@ class GameManager:
                         self.dino.duck(False)
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if self.pause_btn.collidepoint(event.pos) and not self.game_over:
+                    if self.ui.is_pause_button_clicked(event.pos) and not self.game_over:
                         self.toggle_pause()
                     if  self.paused :
                         action = self.ui.handle_pause_menu_click(event.pos)

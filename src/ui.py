@@ -5,6 +5,7 @@ import math
 
 
 from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT, TEXT_COLOR, INITIAL_SCORE
+from src.dino import GROUND_Y
 from src.utils import GO_GREEN, GO_RED
 from src.obstacle import create_obstacle
 from src.highscore import load_highscore, save_highscore
@@ -20,6 +21,52 @@ from src.utils import (
 BTN_COLOR = (70, 70, 70)
 BTN_HOVER = (100, 100, 100)
 BTN_TEXT = (255, 255, 255)
+SKY_TOP     = (100, 180, 230)
+SKY_BOT     = (255, 210, 120)
+GROUND_COL  = (160, 120, 60)
+GROUND_LINE = (120, 85, 35)
+CLOUD_COL   = (255, 255, 255)
+TEXT_LIGHT  = (255, 255, 255)
+GO_BORDER   = (255, 200, 50)
+
+# ==================== GLOBAL CACHES ====================
+# Tile cache
+_tile_cache = {}
+
+
+def _get_cached_tile(name, size):
+    """Cache ground tiles."""
+    key = (name, size)
+    if key not in _tile_cache:
+        _tile_cache[key] = load_image(f"tiles/{name}", size)
+    return _tile_cache[key]
+
+
+def clear_game_cache():
+    """Xóa tất cả cache - gọi khi cần reset hoặc thay đổi settings."""
+    global _tile_cache
+    _tile_cache = {}
+    clear_gradient_cache()
+
+
+# Background cache - sử dụng assets_loader hoặc fallback gradient
+_bg_cache = {}
+
+def _get_bg(bg_index):
+    if bg_index not in _bg_cache:
+        img = load_image(f"background/bg{bg_index}.png", (SCREEN_WIDTH, SCREEN_HEIGHT))
+        if img is None:
+            img = get_gradient_bg(SCREEN_WIDTH, SCREEN_HEIGHT, bg_index, SKY_TOP, SKY_BOT)
+        _bg_cache[bg_index] = img
+    return _bg_cache[bg_index]
+
+
+def clear_game_cache():
+    """Xóa tất cả cache - gọi khi cần reset hoặc thay đổi settings."""
+    global _bg_cache, _tile_cache
+    _bg_cache = {}
+    _tile_cache = {}
+    clear_gradient_cache()
 
 class UILayer:
     def __init__(self, screen):
@@ -46,7 +93,6 @@ class UILayer:
         self.items = ["Resume", "Restart", "Quit"]
         self._calculate_pause_menu_positions(btn_w, btn_h, gap)
 
-        self.ground_offset = 0
         self.bg_offset = 0
         self.particles = []  # Particles khi chết
         self.dust_particles = []  # Bụi khi chạy
@@ -72,20 +118,23 @@ class UILayer:
         text = self.font.render(f"High Score: {highscore}", True, TEXT_COLOR)
         self.screen.blit(text, (SCREEN_WIDTH // 2 - 80, 50))
 
-    def draw_pause_icon(self, is_paused):
+    def _draw_pause_btn(self, is_paused):
         mouse_pos = pygame.mouse.get_pos()
-        color = (150, 150, 150) if self.pause_btn.collidepoint(mouse_pos) else (100, 100, 100)
-        pygame.draw.rect(self.screen, color, self.pause_btn, border_radius=5)
-        
+        hover = self.pause_btn.collidepoint(mouse_pos)
+        color = (180, 180, 180) if hover else (80, 80, 80)
+        pygame.draw.rect(self.screen, color, self.pause_btn, border_radius=8)
+        pygame.draw.rect(self.screen, (220, 220, 220), self.pause_btn, 2, border_radius=8)
         if is_paused:
-            pygame.draw.polygon(self.screen, (255, 255, 255), [
-                (self.pause_btn.left + 12, self.pause_btn.top + 10),
-                (self.pause_btn.left + 12, self.pause_btn.bottom - 10),
-                (self.pause_btn.right - 10, self.pause_btn.centery)
+            pygame.draw.polygon(self.screen, TEXT_LIGHT, [
+                (self.pause_btn.left + 14, self.pause_btn.top + 11),
+                (self.pause_btn.left + 14, self.pause_btn.bottom - 11),
+                (self.pause_btn.right - 10, self.pause_btn.centery),
             ])
         else:
-            pygame.draw.rect(self.screen, (255, 255, 255), (self.pause_btn.left + 10, self.pause_btn.top + 10, 10, 30))
-            pygame.draw.rect(self.screen, (255, 255, 255), (self.pause_btn.left + 30, self.pause_btn.top + 10, 10, 30))
+            pygame.draw.rect(self.screen, TEXT_LIGHT,
+                             (self.pause_btn.left + 11, self.pause_btn.top + 11, 9, 28))
+            pygame.draw.rect(self.screen, TEXT_LIGHT,
+                             (self.pause_btn.left + 30, self.pause_btn.top + 11, 9, 28))
 
     def _draw_button(self, rect, text):
         mouse_pos = pygame.mouse.get_pos()
@@ -96,6 +145,18 @@ class UILayer:
         txt_surf = self.font_hud.render(text, True, BTN_TEXT)
         txt_rect = txt_surf.get_rect(center=rect.center)
         self.screen.blit(txt_surf, txt_rect)
+
+    def _draw_background(self, current_bg_offset):
+        bg = _get_bg(self.bg_index)
+        ox = int(current_bg_offset) % SCREEN_WIDTH
+        self.screen.blit(bg, (-ox, 0))
+        if ox > 0:
+            self.screen.blit(bg, (SCREEN_WIDTH - ox, 0))
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        # (255, 255, 255, 70) là màu trắng với độ mờ 70/255. 
+        # Nếu bạn muốn không gian u ám/tối hơn, hãy đổi thành màu đen: (0, 0, 0, 80)
+        overlay.fill((255, 255, 255, 100)) 
+        self.screen.blit(overlay, (0, 0))
     
     def draw_pause_menu(self):
         # Vẽ nền mờ
@@ -108,6 +169,27 @@ class UILayer:
 
         for item, rect in self.pause_menu_rects.items():
             self._draw_button(rect, item)
+
+    def _draw_ground(self, current_ground_offset):
+        tile_h = SCREEN_HEIGHT - GROUND_Y
+        tile_w = 64
+        y_offset = 30
+        # Sử dụng cached tile
+        tile = _get_cached_tile("Tile_02.png", (tile_w, tile_h))
+        if tile:
+            offset = int(current_ground_offset) % tile_w
+            for x in range(-tile_w, SCREEN_WIDTH + tile_w, tile_w):
+                self.screen.blit(tile, (x - offset, GROUND_Y- y_offset))
+        else:
+            pygame.draw.rect(self.screen, GROUND_COL,
+                             (0, GROUND_Y, SCREEN_WIDTH, tile_h))
+            pygame.draw.line(self.screen, GROUND_LINE,
+                             (0, GROUND_Y), (SCREEN_WIDTH, GROUND_Y), 3)
+            for i in range(-1, SCREEN_WIDTH // 40 + 2):
+                x = i * 40 - int(current_ground_offset) % 40
+                pygame.draw.line(self.screen, GROUND_LINE,
+                                 (x, GROUND_Y + 10), (x + 22, GROUND_Y + 10), 1)
+
 
     def draw_game_over(self, score):
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
