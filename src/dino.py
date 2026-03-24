@@ -46,6 +46,7 @@ class Dino:
         self.height: int = DINO_HEIGHT
         self.vel_y: float = 0
         self.is_jumping: bool = False
+        self.has_shield: bool = False
         self.is_ducking: bool = False
         self.is_on_ground: bool = True
         self.color: Tuple[int, int, int] = DINO_COLOR
@@ -57,6 +58,8 @@ class Dino:
         self._cached_rect: Optional[pygame.Rect] = None
         # Ground y cho lane game
         self.ground_y: int = GROUND_Y
+
+        self.sword_charges = 0     # Số lần chém còn lại của kiếm
 
         # Smooth physics
         self._coyote_timer: int = 0        # Đếm thời gian sau khi rời ground

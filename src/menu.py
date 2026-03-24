@@ -1,6 +1,8 @@
 """
 Menu - Menu chính của game với các lựa chọn
 """
+import sys
+
 import pygame
 import random
 import math
@@ -674,6 +676,9 @@ class Menu:
             clock.tick(60)
             
             for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
                 
                 if self.current_menu == MENU_SETTINGS:
                     self.handle_settings_input(event)

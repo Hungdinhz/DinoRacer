@@ -23,14 +23,14 @@ def clear_ai_cache():
     }
 
 from config.settings import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y,
+    MAX_SPEED_TIME, MAX_X2_TIME, SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y,
     INITIAL_SCORE, SPEED_INCREASE_INTERVAL, SPEED_INCREASE_AMOUNT,
     MIN_OBSTACLE_SPAWN_DISTANCE, OBSTACLE_SPEED_MIN, OBSTACLE_SPEED_MAX,
-    COLLISION_MARGIN, COIN_HEIGHT, COIN_WIDTH
+    COLLISION_MARGIN, COIN_HEIGHT, COIN_WIDTH, PLUS_COUNT_SWORD
 )
 from src.dino import Dino
 from src.obstacle import create_obstacle
-from src.items import Coin
+from src.items import Coin, Shield, SpeedItem, X2Item, SwordItem
 from src.highscore import load_highscore, save_highscore
 from src.assets_loader import play_sound, load_image, CLOUD_POSITIONS
 from src.achievements import check_achievements
@@ -210,6 +210,8 @@ class GameManager:
         self.go_flash_timer = 0
         self.bg_index = 1
         self.last_coin_x = 0  # Cache vị trí coin cuối cùng để spawn hợp lý
+        self.last_item_x = 0  # Cache vị trí item cuối cùng để spawn hợp lý
+        self.next_spawn_items_score = 0  # Điểm để spawn item tiếp theo
 
         # UILayer để vẽ 
         self.ui = UILayer(screen)
@@ -221,6 +223,10 @@ class GameManager:
         self._jump_pressed = False
         self._jump_released = True
         self._last_jump_state = False
+
+        # Bien đếm thời gian buff item
+        self.speed_buff_timer = 0  # Đếm ngược thời gian chạy nhanh
+        self.x2_buff_timer = 0     # Đếm ngược thời gian x2 vàng
 
         self.reset()
 
@@ -241,6 +247,9 @@ class GameManager:
         self._dust_spawn_timer = 0
         self.go_flash_timer = 0
         self.bg_index = 1
+        self.next_spawn_items_score = 0
+        self.speed_buff_timer = 0  # Đếm ngược thời gian chạy nhanh
+        self.x2_buff_timer = 0
 
         # Achievement popup state
         self.pending_achievements = []
@@ -293,7 +302,17 @@ class GameManager:
             if obs.x > dino_x + 100:
                 continue
             if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):
-                return True
+                if self.dino.has_shield:
+                    # Nếu có khiên: Làm vỡ khiên và tha mạng!
+                    self.dino.has_shield = False
+                    
+                    # QUAN TRỌNG: Bạn phải xóa luôn chướng ngại vật đó đi 
+                    # Nếu không frame tiếp theo (1/60 giây sau) nó lại cạ vào Dino báo Game over đấy
+                    self.obstacles.remove(obs) 
+                    #play_sound("shield_break") # Phát tiếng vỡ khiên
+                else:
+                    # Không có khiên -> Chết như bình thường
+                    self.game_over = True
         return False
 
     def update(self, action=None, speed_mult=1.0, jump_held=False):
@@ -311,6 +330,19 @@ class GameManager:
                 p.update()
             self.go_flash_timer += 1
             return
+        
+        # Cập nhật thời gian buff
+        if self.speed_buff_timer > 0:
+            self.speed_buff_timer -= 1
+        if self.x2_buff_timer > 0:
+            self.x2_buff_timer -= 1
+
+        # Tính tốc độ chạy của ván game hiện tại
+        # Nếu đang có buff tốc độ, cho mọi thứ trôi nhanh gấp rưỡi (1.1)
+        current_speed_multiplier = 1.1 if self.speed_buff_timer > 0 else 1.0
+
+        # Khi update chướng ngại vật, nền, item, nhớ nhân với hệ số này
+        actual_speed = self.game_speed * current_speed_multiplier
 
         # Xử lý input AI
         if action is not None:
@@ -345,14 +377,17 @@ class GameManager:
 
         self.spawn_obstacle()
 
-        self.ground_offset = (self.ground_offset + self.game_speed * speed_mult) % 64
-        self.bg_offset = (self.bg_offset + self.game_speed * speed_mult * 0.05) % SCREEN_WIDTH
+        # self.ground_offset = (self.ground_offset + self.game_speed * speed_mult) % 64
+        # self.bg_offset = (self.bg_offset + self.game_speed * speed_mult * 0.05) % SCREEN_WIDTH
+        self.ground_offset = (self.ground_offset + actual_speed) % 64
+        self.bg_offset = (self.bg_offset + actual_speed * 0.05) % SCREEN_WIDTH  
 
         prev_score = self.score
         for obs in self.obstacles:
             old_x = obs.x
-            actual_speed = obs.speed * speed_mult
-            obs.x = old_x - actual_speed
+            # Tốc độ thực tế = tốc độ cơ bản của obs * hệ số của human/AI (speed_mult) * buff tốc độ
+            obs_actual_speed = obs.speed * speed_mult * current_speed_multiplier 
+            obs.x = old_x - obs_actual_speed
             if obs.x < self.dino.x and not obs.passed:
                 obs.passed = True
                 self.score += 1
@@ -390,21 +425,51 @@ class GameManager:
 
         # 2. Cập nhật và kiểm tra ăn Coin
         dino_rect = self.dino.get_rect()
-        for item in self.items:
-            
+        for item in self.items:    
             old_x = item.x
             item.update()
-            actual_speed = item.speed * speed_mult
-            item.x = old_x - actual_speed
-            
+            # Áp dụng buff tốc độ cho item
+            item_actual_speed = item.speed * speed_mult * current_speed_multiplier
+            item.x = old_x - item_actual_speed  
            
             if dino_rect.colliderect(item.get_rect()) and not item.is_collected:
                 item.is_collected = True
-                self.score += item.bonus_points 
-                play_sound("score") # Phát tiếng Ting
+                
+                if isinstance(item, Shield):
+                    self.dino.has_shield = True
+                    
+                elif isinstance(item, SpeedItem):
+                    self.speed_buff_timer = MAX_SPEED_TIME # Ví dụ game chạy 60 FPS -> 300 frame = 5 giây
+                    
+                elif isinstance(item, X2Item):
+                    self.x2_buff_timer = MAX_X2_TIME # x2 vàng trong 10 giây
+                    
+                elif isinstance(item, SwordItem):
+                    self.dino.sword_charges += PLUS_COUNT_SWORD # Cho phép chém 2 lần
+                    
+                else: # Mặc định là Coin
+                    # Nếu đang có buff x2 thì nhân đôi điểm, không thì nhân 1
+                    multiplier = 2 if self.x2_buff_timer > 0 else 1
+                    self.score += getattr(item, 'bonus_points', 10) * multiplier
 
         # 3. Lọc bỏ các Coin đã bay ra khỏi màn hình hoặc ĐÃ BỊ ĂN
         self.items = [i for i in self.items if not i.is_off_screen() and not i.is_collected]
+
+        # Create items every 50 points
+        if self.score > self.next_spawn_items_score and self.score > 0:
+            item_x = SCREEN_WIDTH + 50
+            item_speed = self.game_speed
+            item_type = random.choice(['shield', 'speed', 'x2', 'sword'])
+            if item_type == 'shield':
+                self.items.append(Shield(item_x, item_speed))
+            elif item_type == 'speed':
+                self.items.append(SpeedItem(item_x, item_speed))
+            elif item_type == 'x2':
+                self.items.append(X2Item(item_x, item_speed))
+            elif item_type == 'sword':
+                self.items.append(SwordItem(item_x, item_speed))
+
+            self.next_spawn_items_score += 50
 
         for c in self.clouds:
             c.update()
@@ -556,6 +621,13 @@ class GameManager:
         for item in self.items:
             item.draw(self.screen)
 
+        self.ui.draw_buffs(
+            self.speed_buff_timer, MAX_SPEED_TIME, 
+            self.x2_buff_timer, MAX_X2_TIME, 
+            self.dino.sword_charges,
+            self.dino.has_shield
+        )
+
         pygame.display.flip()
 
     def run_human_mode(self):
@@ -580,6 +652,20 @@ class GameManager:
                     speed_mult = 0.5   # A: chậm 50%
                 elif keys[pygame.K_d]:
                     speed_mult = 1.5   # D: nhanh 150%
+                # Nếu bấm T VÀ còn lượt dùng kiếm
+                elif keys[pygame.K_t] and self.dino.sword_charges > 0:
+                    
+                    # Tìm xem có chướng ngại vật nào đang ở TRƯỚC MẶT khủng long không (khoảng cách tầm 150 pixel)
+                    for obs in self.obstacles:
+                        # Nếu khoảng cách từ khủng long đến chướng ngại vật nằm trong tầm chém
+                        if 0 < (obs.x - self.dino.get_rect().right) < 150:
+                            # Tiêu diệt chướng ngại vật đó!
+                            self.obstacles.remove(obs)
+                            self.dino.sword_charges -= 1 # Trừ 1 lần chém
+                            
+                            # (Tùy chọn) Thêm âm thanh chém kiếm hoặc sinh ra tia lửa ở vị trí obs.x
+                            # play_sound("sword_slash")
+                            break # Chém trúng 1 cái là dừng vòng lặp, chờ bấm T lần sau mới chém tiếp
 
                 # Track trạng thái jump key
                 jump_held = keys[pygame.K_SPACE] or keys[pygame.K_UP]

@@ -228,6 +228,55 @@ class UILayer:
     def is_pause_button_clicked(self, pos):
         return self.pause_btn.collidepoint(pos)
     
+    # Trong class UILayer (file ui.py)
+    def draw_buffs(self, speed_timer, max_speed, x2_timer, max_x2, sword_charges, has_shield):
+        """Vẽ thanh thời gian cho các buff đang kích hoạt"""
+        start_x = 20  # Vẽ ở góc trên bên trái màn hình
+        start_y = 20
+        bar_width = 150
+        bar_height = 15
+        spacing = 25  # Khoảng cách giữa các thanh bar
+
+        current_y = start_y
+
+        # 1. Vẽ thanh Buff Tốc Độ (Màu Cyan)
+        if speed_timer > 0:
+            # Tính chiều dài còn lại của thanh bar (tỉ lệ thuận với thời gian)
+            fill_width = int((speed_timer / max_speed) * bar_width)
+            
+            # Vẽ chữ "Speed" nhỏ xíu
+            text = self.font_small.render("Speed", True, (0, 255, 255))
+            self.screen.blit(text, (start_x, current_y - 2))
+            
+            # Vẽ viền ngoài màu xám tối
+            pygame.draw.rect(self.screen, (50, 50, 50), (start_x + 60, current_y, bar_width, bar_height), border_radius=4)
+            # Vẽ thanh bên trong màu xanh 
+            pygame.draw.rect(self.screen, (0, 200, 255), (start_x + 60, current_y, fill_width, bar_height), border_radius=4)
+            
+            current_y += spacing # Đẩy tọa độ Y xuống cho buff tiếp theo
+
+        # 2. Vẽ thanh Buff X2 Vàng (Màu Vàng)
+        if x2_timer > 0:
+            fill_width = int((x2_timer / max_x2) * bar_width)
+            
+            text = self.font_small.render("x2 Gold", True, (255, 215, 0))
+            self.screen.blit(text, (start_x, current_y - 2))
+            
+            pygame.draw.rect(self.screen, (50, 50, 50), (start_x + 60, current_y, bar_width, bar_height), border_radius=4)
+            pygame.draw.rect(self.screen, (255, 215, 0), (start_x + 60, current_y, fill_width, bar_height), border_radius=4)
+            
+            current_y += spacing
+
+        # 3. Vẽ Số lần chém Kiếm (Text đơn giản)
+        if sword_charges > 0:
+            # Bạn có thể thay bằng icon thanh kiếm nếu đã load ảnh ở assets
+            sword_text = self.font_med.render(f"Swords: {sword_charges} (press T to use)", True, (255, 100, 100))
+            self.screen.blit(sword_text, (start_x, current_y))
+        
+        if has_shield:
+            shield_text = self.font_med.render("Shield: ACTIVE", True, (0, 191, 255))
+            self.screen.blit(shield_text, (start_x, current_y + 30))
+        
 
 
 

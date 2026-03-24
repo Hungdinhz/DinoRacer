@@ -54,6 +54,15 @@ BIRD_HEIGHT = 45
 COIN_WIDTH = 40
 COIN_HEIGHT = 40
 
+# Vật phẩm khác(Item) - Shield
+ITEM_WIDTH = 60
+ITEM_HEIGHT = 60
+
+# BuffsItem
+MAX_SPEED_TIME = 300 # 5 giây
+MAX_X2_TIME = 600    # 10 giây
+PLUS_COUNT_SWORD = 1 # Cho phép chém thêm 1 lần khi nhặt được item kiếm
+
 # Tốc độ chướng ngại vật - Điều chỉnh cho màn hình lớn hơn
 OBSTACLE_SPEED_MIN = 5  # Giảm tốc độ ban đầu để dễ chơi hơn
 OBSTACLE_SPEED_MAX = 15  # Giảm tốc độ tối đa
@@ -64,7 +73,7 @@ MIN_OBSTACLE_SPAWN_DISTANCE = 350
 # Điểm số
 INITIAL_SCORE = 0
 SPEED_INCREASE_INTERVAL = 15  # Tăng điểm cần thiết để tăng tốc
-SPEED_INCREASE_AMOUNT = 0.3   # Tăng tốc chậm hơn
+SPEED_INCREASE_AMOUNT = 0.1   # Tăng tốc chậm hơn
 
 # File lưu trữ
 HIGHSCORE_FILE = "highscore.json"
