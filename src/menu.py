@@ -202,7 +202,62 @@ class Menu:
             pygame.draw.circle(self.gear_icon, (200, 200, 200, 150), (50, 50), 50)
         
         self.gear_rect = self.gear_icon.get_rect()
+        # KHỞI TẠO NÚT INFO VÀ FONT CHỮ
+        from config.settings import SCREEN_WIDTH
+        self.info_btn_rect = pygame.Rect(SCREEN_WIDTH - 200, 45, 50, 50)
+        
+        try:
+            # Nhớ đảm bảo có file arial.ttf trong assets/fonts/
+            self.font_title = pygame.font.Font('assets/fonts/arial.ttf', 24)
+            self.font_desc = pygame.font.Font('assets/fonts/arial.ttf', 18)
+        except Exception as e:
+            print("LỖI không load được Font:", e)
+            self.font_title = pygame.font.SysFont('tahoma', 24, bold=True)
+            self.font_desc = pygame.font.SysFont('tahoma', 18)
+    def draw_info_panel(self):
+        # 1. Tạo bảng nền mờ
+        panel_w, panel_h = 480, 380
+        panel_x = self.info_btn_rect.x - panel_w + 60 
+        panel_y = self.info_btn_rect.bottom + 10
+        
+        panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        panel.fill((30, 30, 40, 230))
+        self.screen.blit(panel, (panel_x, panel_y))
+        
+        pygame.draw.rect(self.screen, (255, 200, 50), (panel_x, panel_y, panel_w, panel_h), 2, border_radius=8)
 
+        # 2. Tiêu đề
+        title = self.font_title.render("THÔNG TIN VẬT PHẨM", True, (255, 230, 80))
+        self.screen.blit(title, (panel_x + 80, panel_y + 15))
+
+        # 3. Danh sách Item (ĐÃ SỬA ĐƯỜNG DẪN ẢNH)
+        items_data = [
+            {"img": "items/Shield.png", "name": "Khiên (Shield)", "desc": "Bảo vệ bạn khỏi 1 lần va chạm."},
+            {"img": "items/Speed.png", "name": "Tốc độ (Speed)", "desc": "Phóng nhanh, tăng tốc trong 5s."},
+            {"img": "items/x2coin.png", "name": "Nhân đôi (X2)", "desc": "Nhân đôi điểm số nhận được trong 10s."},
+            {"img": "items/Sword.png", "name": "Kiếm (Sword)", "desc": "Cho phép chém chướng ngại vật phía trước."}
+        ]
+
+        from src.assets_loader import load_image
+        start_y = panel_y + 60
+        image_y_offset = -15
+        for item in items_data:
+            # Load ảnh
+            img = load_image(item["img"], (70, 70))
+            if img:
+                self.screen.blit(img, (panel_x + 10, start_y + image_y_offset))
+            else:
+                # Nếu sai tên ảnh, vẽ vòng tròn tạm để bạn biết mà sửa
+                pygame.draw.circle(self.screen, (255,0,0), (panel_x + 40, start_y + 20+ image_y_offset), 20)
+            
+            # Tên & Mô tả
+            name_text = self.font_title.render(item["name"], True, (255, 200, 100))
+            self.screen.blit(name_text, (panel_x + 70, start_y - 5))
+            
+            desc_text = self.font_desc.render(item["desc"], True, (220, 220, 220))
+            self.screen.blit(desc_text, (panel_x + 70, start_y + 25))
+            image_y_offset = -12
+            start_y += 75
     def _calculate_button_positions(self):
         if self.current_menu == MENU_MAIN:
             items = self.main_items
@@ -256,11 +311,16 @@ class Menu:
         # Lấy kích thước màn hình hiện tại
         current_w = self.screen.get_width()
         
-        shadow_surf = self.font_title.render(text, True, TITLE_SHADOW_COLOR)
+        # 1. Tạo font chữ siêu to khổng lồ (Size 80)
+        title_font = pygame.font.Font(None, 80)
+        
+        # 2. ĐÃ SỬA: Dùng title_font để vẽ bóng mờ
+        shadow_surf = title_font.render(text, True, TITLE_SHADOW_COLOR)
         shadow_rect = shadow_surf.get_rect(center=(current_w // 2 + 3, y_pos + 3))
         self.screen.blit(shadow_surf, shadow_rect)
         
-        main_surf = self.font_title.render(text, True, TITLE_COLOR)
+        # 3. ĐÃ SỬA: Dùng title_font để vẽ chữ chính
+        main_surf = title_font.render(text, True, TITLE_COLOR)
         main_rect = main_surf.get_rect(center=(current_w // 2, y_pos))
         self.screen.blit(main_surf, main_rect)
 
@@ -622,11 +682,27 @@ class Menu:
                     self.selected = item_idx
                 self.draw_button(item, rect, item_idx == self.selected)
 
-        # Version info
-        sw, sh = self._get_screen_dims()
-        hint = self.font_hint.render("v1.0 - Use Arrows + Enter or Mouse Click", True, (180, 180, 180))
-        self.screen.blit(hint, (10, sh - 25))
+        # ==========================================
+        # VẼ NÚT INFO (TỰ VẼ BẰNG LỆNH)
+        # ==========================================
+        pygame.draw.circle(self.screen, (70, 80, 100), self.info_btn_rect.center, 25)
+        pygame.draw.circle(self.screen, (200, 200, 200), self.info_btn_rect.center, 25, 2)
+        
+        font_i = pygame.font.SysFont('Arial', 25, bold=True)
+        text_i = font_i.render("i", True, (255, 255, 255))
+        self.screen.blit(text_i, text_i.get_rect(center=self.info_btn_rect.center))
 
+        # ==========================================
+        # XỬ LÝ HOVER HIỆN BẢNG THÔNG TIN
+        # ==========================================
+        mouse_pos = pygame.mouse.get_pos()
+        if self.info_btn_rect.collidepoint(mouse_pos):
+            # KHI HOVER: Bỏ dòng vẽ nền trắng mờ đi!
+            # Thay bằng lệnh vẽ một cái viền màu Vàng (Gold) đè lên viền xám cũ, độ dày 3px
+            pygame.draw.circle(self.screen, (255, 215, 0), self.info_btn_rect.center, 25, 3)
+            
+            # Sau đó mới gọi hàm vẽ bảng
+            self.draw_info_panel()
         pygame.display.flip()
 
     def handle_settings_input(self, event):
