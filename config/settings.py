@@ -55,8 +55,15 @@ COIN_WIDTH = 40
 COIN_HEIGHT = 40
 
 # Vật phẩm khác(Item) - Shield
-ITEM_WIDTH = 60
+ITEM_WIDTH = 75
 ITEM_HEIGHT = 60
+
+# Thêm 2 dòng này cho chiếc giày bay (Bạn có thể tăng số 90 lên tùy thích)
+ITSPEED_WIDTH = 120
+ITSPEED_HEIGHT = 95
+
+X2COIN_WIDTH = 160
+X2COIN_HEIGHT = 100
 
 # BuffsItem
 MAX_SPEED_TIME = 300 # 5 giây
