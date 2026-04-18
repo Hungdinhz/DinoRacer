@@ -19,6 +19,17 @@ from src.dino import Dino
 from src.obstacle import create_obstacle, Cactus
 from src.assets_loader import load_image
 
+# Thư mục lưu checkpoint và model
+_CHECKPOINT_DIR = os.path.join(os.path.dirname(__file__), '..', 'checkpoints')
+_MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', 'models')
+
+os.makedirs(_CHECKPOINT_DIR, exist_ok=True)
+os.makedirs(_MODEL_DIR, exist_ok=True)
+
+_CHECKPOINT_FILE = os.path.join(_CHECKPOINT_DIR, 'neat_checkpoint.pkl')
+_BEST_MODEL_FILE  = os.path.join(_MODEL_DIR, 'best_model.pkl')
+_LAST_MODEL_FILE  = os.path.join(_MODEL_DIR, 'last_model.pkl')
+
 # ── Màu sắc ───────────────────────────────────────────
 SKY_TOP    = (30,  30,  60)
 SKY_BOT    = (80,  50, 100)
@@ -111,6 +122,7 @@ class NeatVisualTrainer:
         self.best_score    = 0
         self.winner_genome = None
         self._stop         = False   # cờ Ctrl+C / close
+        self._population   = None    # Lưu population để checkpoint
 
     # ── Game loop cho 1 generation ─────────────────────
 
@@ -157,6 +169,11 @@ class NeatVisualTrainer:
                     # Phím S: bỏ qua generation hiện tại
                     if event.key == pygame.K_s:
                         running = False
+                        break
+                    if event.key == pygame.K_r:
+                        self._stop = True
+                        running = False
+                        self._reset_training()
                         break
 
             if not running:
@@ -229,6 +246,13 @@ class NeatVisualTrainer:
                 self.best_fitness = genome.fitness
                 self.best_score   = score
                 self.winner_genome = genome
+
+        # Lưu checkpoint sau mỗi generation (dùng population.generation để lấy số gen đúng)
+        if self._population:
+            self.generation = self._population.generation
+            self.save_checkpoint(self._population)
+        if self.winner_genome:
+            self.save_genome(self.winner_genome, "best")
 
     # ── Vẽ ──────────────────────────────────────────────
 
@@ -320,23 +344,113 @@ class NeatVisualTrainer:
             self.screen.blit(t, (SCREEN_WIDTH - 132, 12 + i * 22))
 
         # ── Góc dưới: phím tắt ──
-        hint = self.font_small.render("ESC - Dừng training  |  S - Bỏ qua generation", True, (150, 150, 200))
+        hint = self.font_small.render("ESC - Dừng  |  S - Bỏ qua gen  |  R - Reset training", True, (150, 150, 200))
         self.screen.blit(hint, (SCREEN_WIDTH // 2 - hint.get_width() // 2, SCREEN_HEIGHT - 22))
 
         pygame.display.flip()
 
+    # ── Lưu / Load checkpoint ─────────────────────────
+
+    def save_checkpoint(self, population):
+        """Lưu checkpoint sau mỗi generation."""
+        try:
+            with open(_CHECKPOINT_FILE, "wb") as f:
+                pickle.dump(population, f)
+            print(f"[CHECKPOINT] Da luu checkpoint sau gen {self.generation}")
+        except Exception as e:
+            print(f"[CHECKPOINT] Loi luu checkpoint: {e}")
+
+    def load_checkpoint(self):
+        """Load checkpoint cũ nếu có."""
+        if os.path.exists(_CHECKPOINT_FILE):
+            try:
+                with open(_CHECKPOINT_FILE, "rb") as f:
+                    population = pickle.load(f)
+                print(f"[CHECKPOINT] Da load checkpoint cu - tiep tuc tu gen {self.generation}")
+                return population
+            except Exception as e:
+                print(f"[CHECKPOINT] Loi load checkpoint: {e}")
+        return None
+
+    def save_genome(self, genome, label="best"):
+        """Lưu genome ra file riêng."""
+        try:
+            if label == "best":
+                path = _BEST_MODEL_FILE
+            else:
+                path = _LAST_MODEL_FILE
+            with open(path, "wb") as f:
+                pickle.dump(genome, f)
+            print(f"[MODEL] Da luu genome ({label}) tai {path}")
+        except Exception as e:
+            print(f"[MODEL] Loi luu genome: {e}")
+
+    def load_genome_from_model(self, label="best"):
+        """Load genome từ file model riêng."""
+        path = _BEST_MODEL_FILE if label == "best" else _LAST_MODEL_FILE
+        if os.path.exists(path):
+            try:
+                with open(path, "rb") as f:
+                    genome = pickle.load(f)
+                print(f"[MODEL] Da load genome ({label}) tu {path}")
+                return genome
+            except Exception as e:
+                print(f"[MODEL] Loi load genome: {e}")
+        return None
+
+    def _reset_training(self):
+        """Xóa checkpoint và model để train lại từ đầu."""
+        try:
+            if os.path.exists(_CHECKPOINT_FILE):
+                os.remove(_CHECKPOINT_FILE)
+                print("[RESET] Da xoa checkpoint cu")
+            if os.path.exists(_BEST_MODEL_FILE):
+                os.remove(_BEST_MODEL_FILE)
+                print("[RESET] Da xoa best_model cu")
+            if os.path.exists(_LAST_MODEL_FILE):
+                os.remove(_LAST_MODEL_FILE)
+                print("[RESET] Da xoa last_model cu")
+            print("[RESET] Training se bat dau lai tu dau!")
+        except Exception as e:
+            print(f"[RESET] Loi reset: {e}")
+
     # ── Public API ──────────────────────────────────────
 
     def run(self, generations=20):
-        """Chạy NEAT visual training."""
-        population = neat.Population(self.config)
+        """Chạy NEAT visual training - tự động load checkpoint cũ."""
+        # Thử load checkpoint trước
+        loaded_pop = self.load_checkpoint()
+        if loaded_pop:
+            population = loaded_pop
+            # Lấy generation đã chạy từ checkpoint
+            self.generation = population.generation
+            print(f"[TRAINING] Tiep tuc training tu gen {self.generation}")
+        else:
+            # Không có checkpoint → tạo population mới
+            population = neat.Population(self.config)
+            self.generation = 0
+            print("[TRAINING] Bat dau training moi")
+
+        self._population = population
         population.add_reporter(neat.StdOutReporter(True))
         population.add_reporter(neat.StatisticsReporter())
 
         try:
-            population.run(self.eval_genomes_visual, generations)
+            # Chạy thêm generations (tính từ checkpoint)
+            remaining = max(1, generations)
+            population.run(self.eval_genomes_visual, remaining)
         except KeyboardInterrupt:
             print("\nTraining dừng sớm.")
+            # Vẫn lưu lại checkpoint khi dừng sớm
+            self.save_checkpoint(population)
+            if self.winner_genome:
+                self.save_genome(self.winner_genome, "best")
+
+        # Lưu genome cuối cùng
+        if self.winner_genome:
+            self.save_genome(self.winner_genome, "best")
+        if self._population and self._population.best_genome:
+            self.save_genome(self._population.best_genome, "last")
 
         return self.winner_genome
 
@@ -344,6 +458,7 @@ class NeatVisualTrainer:
 def run_neat_visual(screen, config_path, generations=20):
     """
     Entry point: tạo NeatVisualTrainer, chạy training và trả về genome tốt nhất.
+    Tự động load checkpoint cũ và lưu lại sau mỗi generation.
     """
     config = neat.Config(
         neat.DefaultGenome, neat.DefaultReproduction,
@@ -353,3 +468,27 @@ def run_neat_visual(screen, config_path, generations=20):
     trainer = NeatVisualTrainer(screen, config)
     winner = trainer.run(generations=generations)
     return winner, config
+
+
+def get_config_path_local():
+    return os.path.join(os.path.dirname(__file__), '..', 'config', 'neat-config.txt')
+
+
+def load_best_model():
+    """Load model AI tốt nhất đã train."""
+    trainer = NeatVisualTrainer.__new__(NeatVisualTrainer)
+    trainer.generation = 0
+    trainer.best_fitness = 0.0
+    trainer.best_score = 0
+    trainer.winner_genome = None
+    trainer._stop = False
+    trainer._population = None
+    genome = trainer.load_genome_from_model("best")
+    if genome:
+        config = neat.Config(
+            neat.DefaultGenome, neat.DefaultReproduction,
+            neat.DefaultSpeciesSet, neat.DefaultStagnation,
+            get_config_path_local()
+        )
+        return genome, config
+    return None, None

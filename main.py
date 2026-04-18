@@ -131,24 +131,29 @@ def main():
             game.run_pvp_mode()
             
         elif choice == 'NEAT Training' or choice == 'Train AI':
-            print("Bắt đầu NEAT Visual Training... (ESC để dừng, S để skip gen)")
+            print("Bat dau NEAT Visual Training... (ESC de dung, S de skip gen, R de reset)")
             try:
-                from src.neat_visual import run_neat_visual
-                winner, config = run_neat_visual(screen, get_config_path(), generations=50)
+                from src.neat_visual import run_neat_visual, load_best_model
+                from src.ai_handler import get_config_path as ai_config_path
+
+                winner, config = run_neat_visual(screen, ai_config_path(), generations=50)
                 if winner:
-                    from src.ai_handler import save_genome
-                    save_genome(winner)
-                    print("\nTraining xong! Chạy AI tốt nhất...")
-                    run_best_genome_display(winner, config)
+                    print("\nTraining xong! Chay AI tot nhat...")
+                    genome, cfg = load_best_model()
+                    if genome and cfg:
+                        run_best_genome_display(genome, cfg)
+                    else:
+                        print("Khong load duoc model - thu lai training!")
             except Exception as e:
-                print(f"Lỗi Visual Training: {e}")
-                # Fallback về silent training
+                import traceback
+                traceback.print_exc()
+                print(f"Loi Visual Training: {e}")
+                # Fallback ve silent training
                 winner = run_neat_training(generations=20)
                 if winner:
-                    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                                        neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                                        get_config_path())
-                    run_best_genome_display(winner, config)
+                    genome, config = load_genome()
+                    if genome and config:
+                        run_best_genome_display(genome, config)
 
         elif choice == 'Supervised Training':
             print("Bắt đầu Supervised Learning training...")

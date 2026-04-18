@@ -24,6 +24,14 @@ def get_genome_path():
     return os.path.join(os.path.dirname(__file__), '..', BEST_GENOME_FILE)
 
 
+def get_best_model_path():
+    return os.path.join(os.path.dirname(__file__), '..', 'models', 'best_model.pkl')
+
+
+def get_last_model_path():
+    return os.path.join(os.path.dirname(__file__), '..', 'models', 'last_model.pkl')
+
+
 def save_genome(genome):
     try:
         with open(get_genome_path(), "wb") as f:
@@ -34,6 +42,22 @@ def save_genome(genome):
 
 
 def load_genome():
+    """Load genome từ file cũ (best_genome.pkl) hoặc models/best_model.pkl mới."""
+    # Ưu tiên file mới trong models/
+    best_path = get_best_model_path()
+    if os.path.exists(best_path):
+        try:
+            with open(best_path, "rb") as f:
+                genome = pickle.load(f)
+            config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                 neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                 get_config_path())
+            print(f"[AI] Loaded model from {best_path}")
+            return genome, config
+        except Exception as e:
+            print(f"[AI] Loi load tu {best_path}: {e}")
+
+    # Fallback về file cũ
     path = get_genome_path()
     try:
         if os.path.exists(path):
@@ -179,8 +203,21 @@ def run_neat_training(generations=50):
     population.add_reporter(neat.StdOutReporter(True))
     population.add_reporter(neat.StatisticsReporter())
     winner = population.run(eval_genomes, generations)
-    if winner and save_genome(winner):
-        print(f"Đã lưu AI vào {get_genome_path()}")
+    if winner:
+        saved1 = save_genome(winner)
+        # Also save to new model path
+        try:
+            import os as osmod
+            model_dir = os.path.join(os.path.dirname(__file__), '..', 'models')
+            osmod.makedirs(model_dir, exist_ok=True)
+            with open(get_best_model_path(), "wb") as f:
+                pickle.dump(winner, f)
+            saved2 = True
+        except Exception:
+            saved2 = False
+        print(f"AI saved: best_genome.pkl={saved1}, models/best_model.pkl={saved2}")
+        if saved1 or saved2:
+            print(f"Da luu AI vao {get_genome_path()}")
     return winner
 
 
