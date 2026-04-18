@@ -75,8 +75,13 @@ _sheet_cache = {}
 
 def clear_sheet_cache():
     """Xóa cache sprite sheets - dùng khi thay đổi kích thước."""
-    global _sheet_cache
+    global _sheet_cache, _img_cache, _item_sprites, _sprites, _font_cache
     _sheet_cache = {}
+    _img_cache = {}
+    _item_sprites = {}
+    _sprites = {}
+    _font_cache = {}
+    preload_item_sprites()
 
 
 def get_sheet(filename, num_frames, target_w, target_h):
@@ -88,18 +93,57 @@ def get_sheet(filename, num_frames, target_w, target_h):
 
 
 # --- Load ảnh đơn ---
+_img_cache = {}
+
+# --- Font cache ---
+_font_cache = {}
+
+# --- Item sprite cache ---
+_item_sprites = {}
+
+
 def load_image(path, scale=None):
-    """Tải ảnh đơn, trả về Surface hoặc None nếu không có file."""
+    """Tải ảnh đơn (cached), trả về Surface hoặc None nếu không có file."""
+    key = (path, scale)
+    if key in _img_cache:
+        return _img_cache[key]
     full = os.path.join(current_path, path)
+    img = None
     try:
         if os.path.exists(full):
             img = pygame.image.load(full).convert_alpha()
             if scale:
                 img = pygame.transform.scale(img, scale)
-            return img
     except pygame.error:
         pass
-    return None
+    _img_cache[key] = img
+    return img
+
+
+def get_cached_font_item(name, size, bold=False):
+    """Font cache cho item (tránh tạo mới mỗi frame)."""
+    key = (name, size, bold)
+    if key not in _font_cache:
+        _font_cache[key] = pygame.font.SysFont(name, size, bold=bold)
+    return _font_cache[key]
+
+
+def preload_item_sprites():
+    """Load tất cả sprite item một lần khi game khởi động."""
+    from config.settings import ITEM_WIDTH, ITEM_HEIGHT, ITSPEED_WIDTH, ITSPEED_HEIGHT, X2COIN_WIDTH, X2COIN_HEIGHT
+    paths_sizes = [
+        ('shield', 'items/Shield.png',  (ITEM_WIDTH,  ITEM_HEIGHT)),
+        ('speed',  'items/Speed.png',   (ITSPEED_WIDTH, ITSPEED_HEIGHT)),
+        ('x2',     'items/x2coin.png',   (X2COIN_WIDTH, X2COIN_HEIGHT)),
+        ('sword',  'items/Sword.png',    (X2COIN_WIDTH, X2COIN_HEIGHT)),
+    ]
+    for key, path, size in paths_sizes:
+        _item_sprites[key] = load_image(path, size)
+
+
+def get_item_sprite(item_type):
+    """Lấy sprite đã cache sẵn cho item type."""
+    return _item_sprites.get(item_type)
 
 
 _sprites = {}

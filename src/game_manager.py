@@ -459,16 +459,19 @@ class GameManager:
 
         # Create items every 50 points
         if self.score > self.next_spawn_items_score and self.score > 0:
+            # Luôn cộng mốc điểm NGAY KHI đạt ngưỡng — không phụ thuộc item có thực sự spawn được hay không
+            self.next_spawn_items_score += 50
+
             item_x = SCREEN_WIDTH + 50
-            
+
             # THÊM ĐOẠN NÀY: Kiểm tra khoảng cách với chướng ngại vật gần nhất
             dist_to_last_obs = item_x - getattr(self, 'last_obstacle_x', 0)
-            
+
             # Chỉ sinh item nếu cách chướng ngại vật ít nhất 200 pixel
             if dist_to_last_obs > 200:
                 item_speed = self.game_speed
                 item_type = random.choice(['shield', 'speed', 'x2', 'sword'])
-                
+
                 if item_type == 'shield':
                     self.items.append(Shield(item_x, item_speed))
                 elif item_type == 'speed':
@@ -477,9 +480,6 @@ class GameManager:
                     self.items.append(X2Item(item_x, item_speed))
                 elif item_type == 'sword':
                     self.items.append(SwordItem(item_x, item_speed))
-
-                # Chỉ cộng mốc điểm khi item THỰC SỰ đã được sinh ra
-                self.next_spawn_items_score += 50
 
         for c in self.clouds:
             c.update()

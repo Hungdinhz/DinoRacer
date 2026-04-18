@@ -12,7 +12,7 @@ from src.ai_handler import (
     get_config_path,
     load_genome,
 )
-from src.assets_loader import clear_sheet_cache
+from src.assets_loader import clear_sheet_cache, preload_item_sprites
 from src.utils import get_cached_font
 from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
 
@@ -43,6 +43,8 @@ def main():
 
     # Xóa cache sprite để load lại với kích thước mới
     clear_sheet_cache()
+    # Pre-load tất cả item sprite một lần tránh lag khi spawn
+    preload_item_sprites()
 
     # Biến theo dõi fullscreen
     is_fullscreen = [False]
