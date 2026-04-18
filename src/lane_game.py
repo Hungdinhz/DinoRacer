@@ -9,11 +9,13 @@ from config.settings import (
     SCREEN_WIDTH, SPEED_INCREASE_INTERVAL, SPEED_INCREASE_AMOUNT,
     MIN_OBSTACLE_SPAWN_DISTANCE, OBSTACLE_SPEED_MIN, OBSTACLE_SPEED_MAX,
     INITIAL_SCORE, COLLISION_MARGIN, LANE_HEIGHT,
+    MAX_SPEED_TIME, MAX_X2_TIME, PLUS_COUNT_SWORD,
 )
 from src.dino import Dino
 from src.obstacle import create_obstacle
 from src.assets_loader import play_sound, load_image
 from src.data_collector import get_collector
+from src.items import Coin, Shield, SpeedItem, X2Item, SwordItem
 from src.utils import get_cached_font
 from src.ui import UILayer
 
@@ -129,9 +131,16 @@ class LaneGame:
         self.dino._cached_rect = None
 
         self.obstacles = []
+        self.items = []
         self.score = INITIAL_SCORE
         self.game_speed = OBSTACLE_SPEED_MIN
         self.last_obstacle_x = 0
+        self.last_item_x = 0
+        self.last_coin_x = 0
+        self.next_spawn_distance = 0
+        self.next_spawn_items_score = 0
+        self.speed_buff_timer = 0
+        self.x2_buff_timer = 0
         self.game_over = False
         self.ground_offset = 0
         self.bg_offset = 0
@@ -183,7 +192,14 @@ class LaneGame:
                 d.anim_frame = (d.anim_frame + 1) % _ANIM_FRAMES.get(anim, 1)
 
     def _spawn_obstacle(self):
-        if self.last_obstacle_x - LANE_W < -MIN_OBSTACLE_SPAWN_DISTANCE:
+        target_distance = getattr(self, 'next_spawn_distance', 600)
+
+        last_coin_x = max([i.x for i in self.items]) if self.items else 0
+        dist_to_last_coin = (LANE_W + 50) - last_coin_x
+        last_special_x = max([i.x for i in self.items if not isinstance(i, Coin)], default=0)
+        dist_to_last_item = float('inf') if last_special_x == 0 else (LANE_W + 50) - last_special_x
+
+        if (LANE_W - self.last_obstacle_x) > target_distance and dist_to_last_coin > 150 and dist_to_last_item > 150:
             speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
             obs = create_obstacle(LANE_W + 50, speed)
             from src.obstacle import Cactus, Bird
@@ -195,6 +211,7 @@ class LaneGame:
                 obs.y = int(obs.y * ratio)
             self.obstacles.append(obs)
             self.last_obstacle_x = obs.x
+            self.next_spawn_distance = random.randint(500, 1000)
 
     def check_collision(self):
         from config.settings import DINO_HEIGHT, DUCK_HEIGHT_RATIO, COLLISION_MARGIN
@@ -208,6 +225,10 @@ class LaneGame:
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
         for obs in self.obstacles:
             if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):
+                if self.dino.has_shield:
+                    self.dino.has_shield = False
+                    self.obstacles.remove(obs)
+                    return False
                 return True
         return False
 
@@ -298,14 +319,22 @@ class LaneGame:
 
         # Update dino physics using proper update method
         self.dino.update(jump_held=False)
+
+        if self.speed_buff_timer > 0:
+            self.speed_buff_timer -= 1
+        if self.x2_buff_timer > 0:
+            self.x2_buff_timer -= 1
+
+        current_speed_multiplier = 1.1 if self.speed_buff_timer > 0 else 1.0
+
         self._spawn_obstacle()
 
-        self.ground_offset = (self.ground_offset + self.game_speed) % 64
-        self.bg_offset = (self.bg_offset + self.game_speed * 0.15) % LANE_W
+        self.ground_offset = (self.ground_offset + self.game_speed * current_speed_multiplier) % 64
+        self.bg_offset = (self.bg_offset + self.game_speed * 0.15 * current_speed_multiplier) % LANE_W
 
         prev = self.score
         for obs in self.obstacles:
-            obs.update()
+            obs.x -= obs.speed * current_speed_multiplier
             if obs.x < self.dino.x and not obs.passed:
                 obs.passed = True
                 self.score += 1
@@ -319,6 +348,66 @@ class LaneGame:
         self.game_speed = OBSTACLE_SPEED_MIN + (self.score // SPEED_INCREASE_INTERVAL) * SPEED_INCREASE_AMOUNT
         self.game_speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
         self.bg_index = min(1 + self.score // 50, 5)
+
+        # 1. Spawn coins if enough space
+        start_coin_x = LANE_W + 50
+        dist_to_last_obs = start_coin_x - self.last_obstacle_x
+        expected_next_obs_x = self.last_obstacle_x + getattr(self, 'next_spawn_distance', 500)
+        dist_to_next_obs = expected_next_obs_x - start_coin_x
+        self.last_coin_x = max(i.x for i in self.items) if self.items else 0
+        dist_to_last_coin = start_coin_x - self.last_coin_x
+
+        if (len(self.items) < 5 and random.random() < 0.03 and
+            dist_to_last_obs > 250 and
+            dist_to_next_obs > 250 and
+            dist_to_last_coin > 350):
+            count_coins = random.randint(1, 4)
+            for i in range(count_coins):
+                if len(self.items) < 5:
+                    coin_x = start_coin_x + i * 50
+                    coin_speed = self.game_speed
+                    coin = Coin(coin_x, coin_speed)
+                    coin.y = GROUND_Y_LANE - coin.height - 20
+                    self.items.append(coin)
+
+        # 2. Update items and collect
+        dino_rect = self.get_dino_rect()
+        for item in self.items:
+            item.x -= item.speed * current_speed_multiplier
+            if dino_rect.colliderect(item.get_rect()) and not item.is_collected:
+                item.is_collected = True
+                if isinstance(item, Shield):
+                    self.dino.has_shield = True
+                elif isinstance(item, SpeedItem):
+                    self.speed_buff_timer = MAX_SPEED_TIME
+                elif isinstance(item, X2Item):
+                    self.x2_buff_timer = MAX_X2_TIME
+                elif isinstance(item, SwordItem):
+                    self.dino.sword_charges += PLUS_COUNT_SWORD
+                else:
+                    multiplier = 2 if self.x2_buff_timer > 0 else 1
+                    self.score += getattr(item, 'bonus_points', 10) * multiplier
+
+        self.items = [i for i in self.items if not i.is_off_screen() and not i.is_collected]
+        self.last_item_x = max([i.x for i in self.items if not isinstance(i, Coin)], default=0)
+
+        if self.score > self.next_spawn_items_score and self.score > 0:
+            item_x = LANE_W + 50
+            dist_to_last_obs = item_x - getattr(self, 'last_obstacle_x', 0)
+            if dist_to_last_obs > 200:
+                item_type = random.choice(['shield', 'speed', 'x2', 'sword'])
+                if item_type == 'shield':
+                    item = Shield(item_x, self.game_speed)
+                elif item_type == 'speed':
+                    item = SpeedItem(item_x, self.game_speed)
+                elif item_type == 'x2':
+                    item = X2Item(item_x, self.game_speed)
+                else:
+                    item = SwordItem(item_x, self.game_speed)
+                item.y = GROUND_Y_LANE - item.height
+                self.items.append(item)
+                self.last_item_x = item_x
+                self.next_spawn_items_score += 50
 
         for c in self.clouds:
             c.update()
@@ -379,6 +468,9 @@ class LaneGame:
 
         for obs in self.obstacles:
             obs.draw(surf)
+
+        for item in self.items:
+            item.draw(surf)
 
         lbl = self.font_label.render(self.label, True, self.label_color)
         surf.blit(lbl, (8, 6))

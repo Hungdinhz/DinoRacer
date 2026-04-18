@@ -270,9 +270,11 @@ class GameManager:
         # TÌM XU CỦA ĐỒNG XU CUỐI CÙNG (Nếu có)
         last_coin_x = max([i.x for i in getattr(self, 'items', [])]) if getattr(self, 'items', []) else 0
         dist_to_last_coin = (SCREEN_WIDTH + 50) - last_coin_x
+
+        dist_to_last_item = (SCREEN_WIDTH + 50) - self.last_item_x if getattr(self, 'last_item_x', 0) else float('inf')
         
-        # KIỂM TRA: Đủ khoảng cách với cây cũ VÀ đủ khoảng cách với đồng xu mới nhất
-        if (SCREEN_WIDTH - self.last_obstacle_x) > target_distance and dist_to_last_coin > 150:
+        # KIỂM TRA: Đủ khoảng cách với cây cũ VÀ đủ khoảng cách với đồng xu mới nhất va item mới nhất không (để tránh spawn chồng lên nhau)
+        if (SCREEN_WIDTH - self.last_obstacle_x) > target_distance and dist_to_last_coin > 150 and dist_to_last_item > 150:
             speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
             
             # Khởi tạo chướng ngại vật mới ở tít ngoài mép phải màn hình
@@ -423,7 +425,7 @@ class GameManager:
                         coin_speed = self.game_speed
                         self.items.append(Coin(coin_x, coin_speed))
 
-        # 2. Cập nhật và kiểm tra ăn Coin
+        # 2. Cập nhật và kiểm tra ăn Item
         dino_rect = self.dino.get_rect()
         for item in self.items:    
             old_x = item.x
@@ -458,18 +460,26 @@ class GameManager:
         # Create items every 50 points
         if self.score > self.next_spawn_items_score and self.score > 0:
             item_x = SCREEN_WIDTH + 50
-            item_speed = self.game_speed
-            item_type = random.choice(['shield', 'speed', 'x2', 'sword'])
-            if item_type == 'shield':
-                self.items.append(Shield(item_x, item_speed))
-            elif item_type == 'speed':
-                self.items.append(SpeedItem(item_x, item_speed))
-            elif item_type == 'x2':
-                self.items.append(X2Item(item_x, item_speed))
-            elif item_type == 'sword':
-                self.items.append(SwordItem(item_x, item_speed))
+            
+            # THÊM ĐOẠN NÀY: Kiểm tra khoảng cách với chướng ngại vật gần nhất
+            dist_to_last_obs = item_x - getattr(self, 'last_obstacle_x', 0)
+            
+            # Chỉ sinh item nếu cách chướng ngại vật ít nhất 200 pixel
+            if dist_to_last_obs > 200:
+                item_speed = self.game_speed
+                item_type = random.choice(['shield', 'speed', 'x2', 'sword'])
+                
+                if item_type == 'shield':
+                    self.items.append(Shield(item_x, item_speed))
+                elif item_type == 'speed':
+                    self.items.append(SpeedItem(item_x, item_speed))
+                elif item_type == 'x2':
+                    self.items.append(X2Item(item_x, item_speed))
+                elif item_type == 'sword':
+                    self.items.append(SwordItem(item_x, item_speed))
 
-            self.next_spawn_items_score += 50
+                # Chỉ cộng mốc điểm khi item THỰC SỰ đã được sinh ra
+                self.next_spawn_items_score += 50
 
         for c in self.clouds:
             c.update()
