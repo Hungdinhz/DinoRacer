@@ -818,6 +818,8 @@ class GameManager:
                         if not player_lane.game_over: player_lane.dino.duck(True)
                     if event.key == pygame.K_r: ai_lane.reset(); player_lane.reset()
                     if event.key == pygame.K_ESCAPE: running = False
+                    if event.key == pygame.K_t:
+                        if not player_lane.game_over: player_lane.sword_slash()
                 if event.type == pygame.KEYUP:
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
                         player_lane.dino.jump_release()
@@ -950,6 +952,11 @@ class GameManager:
                         both_game_over_drawn = False
                     if event.key == pygame.K_ESCAPE:
                         running = False
+                    # P1: T = Sword | P2: K_1 = Sword
+                    if event.key == pygame.K_t:
+                        if not p1.game_over: p1.sword_slash()
+                    if event.key == pygame.K_1:
+                        if not p2.game_over: p2.sword_slash()
 
             # --- BƯỚC 2: CẬP NHẬT TÁCH BIỆT "VŨ TRỤ" ---
 

@@ -100,6 +100,43 @@ class UILayer:
         self.go_flash_timer = 0
         self.bg_index = 1
 
+        # Notification system
+        self.notifications = []  # list of {"text", "color", "timer", "max_timer", "y_offset"}
+
+    def add_notification(self, text, color=(255, 255, 255), duration=90):
+        """Thêm thông báo hiệu ứng item."""
+        self.notifications.append({
+            "text": text,
+            "color": color,
+            "timer": duration,
+            "max_timer": duration,
+            "y_offset": 0.0,
+        })
+
+    def update_notifications(self):
+        """Cập nhật notification: giảm timer, xóa hết."""
+        alive = []
+        for n in self.notifications:
+            n["timer"] -= 1
+            n["y_offset"] -= 1.0  # trôi lên
+            if n["timer"] > 0:
+                alive.append(n)
+        self.notifications = alive
+
+    def draw_notifications(self):
+        """Vẽ các notification đang active."""
+        for i, n in enumerate(self.notifications):
+            # Fade: alpha giảm dần
+            alpha = int(255 * (n["timer"] / n["max_timer"]))
+            if alpha <= 0:
+                continue
+            text_surf = self.font_med.render(n["text"], True, n["color"])
+            text_surf.set_alpha(alpha)
+            # Vẽ ở giữa màn hình, mỗi cái cách nhau 40px
+            y = SCREEN_HEIGHT // 2 - 80 + i * 40 + n["y_offset"]
+            x = SCREEN_WIDTH // 2 - text_surf.get_width() // 2
+            self.screen.blit(text_surf, (x, y))
+
     def _calculate_pause_menu_positions(self, btn_w, btn_h, gap):
         """Tính vị trí các nút trong menu Pause"""
         cx = SCREEN_WIDTH // 2

@@ -143,6 +143,9 @@ class LaneGame:
         self.x2_buff_timer = 0
         self.game_over = False
         self.ground_offset = 0
+
+        # Notification system
+        self.notifications = []
         self.bg_offset = 0
         self.bg_index = 1
         self.go_flash_timer = 0
@@ -231,6 +234,50 @@ class LaneGame:
                     return False
                 return True
         return False
+
+    def sword_slash(self):
+        """Chém chướng ngại vật phía trước mặt dino (tầm 150px)."""
+        if self.dino.sword_charges <= 0:
+            return
+        dino_right = self.dino.x + self.dino.width
+        for obs in self.obstacles:
+            if 0 < (obs.x - dino_right) < 150:
+                self.obstacles.remove(obs)
+                self.dino.sword_charges -= 1
+                self.add_notification("SLASH!", (255, 80, 80))
+                break
+
+    def add_notification(self, text, color=(255, 255, 255), duration=90):
+        """Thêm thông báo hiệu ứng item."""
+        self.notifications.append({
+            "text": text,
+            "color": color,
+            "timer": duration,
+            "max_timer": duration,
+            "y_offset": 0.0,
+        })
+
+    def update_notifications(self):
+        """Cập nhật notification: giảm timer, xóa hết."""
+        alive = []
+        for n in self.notifications:
+            n["timer"] -= 1
+            n["y_offset"] -= 1.0
+            if n["timer"] > 0:
+                alive.append(n)
+        self.notifications = alive
+
+    def draw_notifications(self, surf):
+        """Vẽ notifications lên surface."""
+        for i, n in enumerate(self.notifications):
+            alpha = int(255 * (n["timer"] / n["max_timer"]))
+            if alpha <= 0:
+                continue
+            text_surf = self.font_small.render(n["text"], True, n["color"])
+            text_surf.set_alpha(alpha)
+            y = LANE_H // 2 - 60 + i * 28 + int(n["y_offset"])
+            x = LANE_W // 2 - text_surf.get_width() // 2
+            surf.blit(text_surf, (x, y))
 
     def get_dino_rect(self):
         from config.settings import DUCK_HEIGHT_RATIO
