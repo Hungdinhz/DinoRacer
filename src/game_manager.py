@@ -259,6 +259,7 @@ class GameManager:
 
         # Cache giá trị tính toán thường dùng
         self._half_screen = SCREEN_WIDTH // 2
+        self.game_won = False
 
     def toggle_pause(self):
         self.paused = not self.paused
@@ -311,7 +312,7 @@ class GameManager:
                     # QUAN TRỌNG: Bạn phải xóa luôn chướng ngại vật đó đi 
                     # Nếu không frame tiếp theo (1/60 giây sau) nó lại cạ vào Dino báo Game over đấy
                     self.obstacles.remove(obs) 
-                    #play_sound("shield_break") # Phát tiếng vỡ khiên
+                    play_sound("shield_broken")
                 else:
                     # Không có khiên -> Chết như bình thường
                     self.game_over = True
@@ -333,6 +334,7 @@ class GameManager:
             if 0 < (obs.x - dino_right) < 150:
                 self.obstacles.remove(obs)
                 self.dino.sword_charges -= 1
+                play_sound("sword_slash")
                 return True
         return False
 
@@ -345,6 +347,9 @@ class GameManager:
         """
         if self.paused:
             return
+        if getattr(self, 'game_won', False):
+            return
+
         if self.game_over:
             self.particles = [p for p in self.particles if p.life > 0]
             for p in self.particles:
@@ -412,6 +417,8 @@ class GameManager:
             if obs.x < self.dino.x and not obs.passed:
                 obs.passed = True
                 self.score += 1
+            if self.score >= 2000 and not self.is_ai_mode:
+                    self.game_over = True
         if self.score // 100 > prev_score // 100 and self.score > 0:
             play_sound("score")
 
@@ -455,6 +462,11 @@ class GameManager:
            
             if dino_rect.colliderect(item.get_rect()) and not item.is_collected:
                 item.is_collected = True
+                
+                if isinstance(item, Coin):
+                    play_sound("coin")
+                else:
+                    play_sound("item_pickup")
                 
                 if isinstance(item, Shield):
                     self.dino.has_shield = True
@@ -502,6 +514,11 @@ class GameManager:
 
         for c in self.clouds:
             c.update()
+            
+        if self.score >= 1000 and not self.is_ai_mode:
+            self.game_won = True
+            # play_sound("win") # Bỏ comment nếu bạn có file âm thanh win
+            return
 
         if self.check_collision():
             self.game_over = True
@@ -635,12 +652,13 @@ class GameManager:
             obs.draw(self.screen)
         self._draw_hud()
         #self._draw_pause_btn()
-        self.ui._draw_pause_btn(self.paused)
         if self.paused:
-            # self._draw_paused_overlay()
             self.ui.draw_pause_menu()
+        elif getattr(self, 'game_won', False):
+            self._draw_god_result()  # Nếu thắng thì gọi bảng GOD
         elif self.game_over:
-            self.ui.draw_game_over(self.score)
+            self.ui.draw_game_over(self.score) # Nếu thua thì gọi bảng Game Over
+            
         self._draw_achievement_popup()
         
         pygame.draw.rect(self.screen, (0, 255, 0), self.dino.get_rect(), 2)
@@ -1116,3 +1134,29 @@ class GameManager:
 
             pygame.display.flip()
             self.clock.tick(120)  # PVP mode chạy 120 FPS mượt hơn
+    def _draw_god_result(self):
+        # 1. Phủ màn hình màu vàng nhạt bán trong suốt cho sang trọng
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((255, 215, 0, 100)) 
+        self.screen.blit(overlay, (0, 0))
+
+        # 2. Vẽ bảng thông báo
+        pw, ph = 500, 250
+        px, py = SCREEN_WIDTH // 2 - pw // 2, SCREEN_HEIGHT // 2 - ph // 2
+        pygame.draw.rect(self.screen, (20, 20, 20), (px, py, pw, ph), border_radius=15)
+        pygame.draw.rect(self.screen, (255, 215, 0), (px, py, pw, ph), 4, border_radius=15)
+
+        # Thử đổi sang "tahoma" hoặc "segoe ui"
+        font_god = pygame.font.SysFont("tahoma", 45, bold=True)
+        txt_god = font_god.render("BẠN CHÍNH LÀ GOD", True, (245, 205, 0))
+        self.screen.blit(txt_god, txt_god.get_rect(center=(SCREEN_WIDTH // 2, py + 70)))
+
+        font_text = pygame.font.SysFont("tahoma", 24)
+        
+        # Nếu font tahoma vẫn lỗi, hãy sửa text thành: "Diem cua ban:"
+        txt_score = font_text.render(f"Điểm của bạn: {self.score}", True, (255, 255, 255))
+        self.screen.blit(txt_score, txt_score.get_rect(center=(SCREEN_WIDTH // 2, py + 140)))
+
+        # Tương tự: "Nhan R de choi lai | ESC de thoat"
+        txt_hint = font_text.render("Nhấn R để chơi lại | ESC để thoát", True, (200, 200, 200))
+        self.screen.blit(txt_hint, txt_hint.get_rect(center=(SCREEN_WIDTH // 2, py + 200)))

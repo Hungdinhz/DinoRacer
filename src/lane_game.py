@@ -233,6 +233,7 @@ class LaneGame:
                 if self.dino.has_shield:
                     self.dino.has_shield = False
                     self.obstacles.remove(obs)
+                    play_sound("shield_broken")
                     return False
                 return True
         return False
@@ -254,6 +255,7 @@ class LaneGame:
                 self.obstacles.remove(obs)
                 self.dino.sword_charges -= 1
                 self.add_notification("SLASH!", (255, 80, 80))
+                play_sound("sword_slash")
                 break
 
     def add_notification(self, text, color=(255, 255, 255), duration=90):
@@ -435,6 +437,12 @@ class LaneGame:
             item.x = old_x - item.speed * current_speed_multiplier
             if dino_rect.colliderect(item.get_rect()) and not item.is_collected:
                 item.is_collected = True
+                
+                if isinstance(item, Coin):
+                    play_sound("coin")
+                else:
+                    play_sound("item_pickup")
+                
                 if isinstance(item, Shield):
                     self.dino.has_shield = True
                     self.add_notification("SHIELD!", (0, 191, 255))
