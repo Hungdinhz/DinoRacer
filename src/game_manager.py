@@ -916,6 +916,8 @@ class GameManager:
                     if event.key == pygame.K_DOWN:
                         if not player_lane.game_over: player_lane.dino.duck(True)
                     if event.key == pygame.K_r:
+                        game_ended = False
+                        match_result = None
                         ai_state, player_state = self._create_lane_random_states(same_map=same_map)
                         ai_lane, ai_state = self._create_lane_with_random_state(
                             ai_state,
@@ -966,7 +968,17 @@ class GameManager:
                 ai_state = self._update_lane_with_random_state(ai_lane, ai_state)
 
             player_state = self._update_lane_with_random_state(player_lane, player_state)
-            ai_lane.draw(); player_lane.draw()
+            if not game_ended:
+                if ai_lane.game_over and player_lane.game_over:
+                    if player_lane.score > ai_lane.score:
+                        match_result = "YOU WIN!"
+                    elif ai_lane.score > player_lane.score:
+                        match_result = "AI WINS!"
+                    else:
+                        match_result = "DRAW!"
+                    game_ended = True
+            ai_lane.draw(show_go=False) 
+            player_lane.draw(show_go=False)
             self.screen.blit(ai_lane.surface, (0, 0))
             self.screen.blit(div, (0, LANE_H))
             self.screen.blit(player_lane.surface, (0, LANE_H + 4))
@@ -999,9 +1011,9 @@ class GameManager:
 
                 ai_txt = font_score.render(f"AI Score: {ai_lane.score:05d}", True, (200, 150, 255))
                 self.screen.blit(ai_txt, ai_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 150)))
-            if ai_lane.game_over or player_lane.game_over:
-                hint = font_hint.render('R - Retry  |  ESC - Menu', True, (220, 220, 220))
-                self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, LANE_H * 2 + 4 - 12)))
+            
+            hint = font_hint.render('R - Retry  |  ESC - Menu', True, (220, 220, 220))
+            self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, LANE_H * 2 + 4 - 20)))
             pygame.display.flip(); self.clock.tick(FPS)
 
     def run_pvp_mode(self):
