@@ -111,6 +111,7 @@ class GameSettings:
             self.difficulty = get_setting('difficulty', 'normal')
             self.ai_difficulty = get_setting('ai_difficulty', 'medium')
             self.skin_dino = get_setting('skin_dino', 'dino')
+            self.two_lane_map_mode = get_setting('two_lane_map_mode', 'same')
         except Exception:
             self.sound_enabled = True
             self.music_enabled = True
@@ -118,6 +119,7 @@ class GameSettings:
             self.difficulty = 'normal'
             self.ai_difficulty = 'medium'
             self.skin_dino = 'dino'
+            self.two_lane_map_mode = 'same'
     
     def save_settings(self):
         """Lưu settings vào database"""
@@ -129,6 +131,7 @@ class GameSettings:
             set_setting('difficulty', self.difficulty)
             set_setting('ai_difficulty', self.ai_difficulty)
             set_setting('skin_dino', self.skin_dino)
+            set_setting('two_lane_map_mode', self.two_lane_map_mode)
         except Exception as e:
             print(f"Error saving settings: {e}")
     
@@ -298,6 +301,27 @@ class Menu:
             # Lưu index thực sự của item
             self.button_rects.append((item_idx, rect))
 
+    def _ensure_selected_visible(self, total_items):
+        """Đảm bảo item đang chọn luôn nằm trong vùng hiển thị khi menu có scroll."""
+        if total_items <= 0:
+            self.selected = 0
+            self.scroll_offset = 0
+            return
+
+        self.selected = max(0, min(self.selected, total_items - 1))
+
+        if total_items <= self.max_visible_buttons:
+            self.scroll_offset = 0
+            return
+
+        max_scroll = total_items - self.max_visible_buttons
+        if self.selected < self.scroll_offset:
+            self.scroll_offset = self.selected
+        elif self.selected >= self.scroll_offset + self.max_visible_buttons:
+            self.scroll_offset = self.selected - self.max_visible_buttons + 1
+
+        self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
+
     def draw_background(self):
         # Sử dụng cached background thay vì vẽ lại mỗi frame
         self.screen.blit(_get_menu_background(), (0, 0))
@@ -376,6 +400,7 @@ class Menu:
     def draw_settings_menu(self):
         self.draw_background()
         self.draw_title_with_shadow("SETTINGS", 80)
+        #sw, sh = self.screen.get_size()
         # === THÊM ĐOẠN VẼ MŨI TÊN BACK ===
         mouse_pos = pygame.mouse.get_pos()
         self.back_arrow_rect = pygame.Rect(20, 20, 60, 40)
@@ -399,26 +424,33 @@ class Menu:
             f"Difficulty: {settings.difficulty.capitalize()}",
             f"AI Level: {settings.ai_difficulty.capitalize()}",
             f"Skin: {skin_label}",
+            f"2-Lane Map: {settings.two_lane_map_mode.capitalize()}",
             "Back"
         ]
+        self._ensure_selected_visible(len(self.settings_items))
         self._calculate_button_positions()
 
+        sw, sh = self._get_screen_dims()
         mouse_pos = pygame.mouse.get_pos()
 
-        for i, button_data in enumerate(self.button_rects):
+        for button_data in self.button_rects:
             # Handle tuple (item_idx, rect) or just rect
             if isinstance(button_data, tuple):
                 item_idx, rect = button_data
-                item = self.settings_items[i] if i < len(self.settings_items) else ""
             else:
                 rect = button_data
-                item = self.settings_items[i] if i < len(self.settings_items) else ""
+                item_idx = 0
+            item = self.settings_items[item_idx] if item_idx < len(self.settings_items) else ""
             is_hovered = rect.collidepoint(mouse_pos)
-            if is_hovered: self.selected = i
-            self.draw_button(item, rect, i == self.selected)
+            if is_hovered:
+                self.selected = item_idx
+            self.draw_button(item, rect, item_idx == self.selected)
+
+        if self.is_scrolling:
+            scroll_hint = self.font_hint.render("Mouse wheel / Up Down để kéo danh sách", True, (220, 220, 220))
+            self.screen.blit(scroll_hint, (sw // 2 - scroll_hint.get_width() // 2, sh - 65))
 
         # Draw instructions
-        sw, sh = self._get_screen_dims()
         hint1 = self.font_hint.render("Left/Right arrows to toggle, Up/Down to select", True, (200, 200, 200))
         self.screen.blit(hint1, (sw // 2 - hint1.get_width() // 2, sh - 40))
 
@@ -709,8 +741,10 @@ class Menu:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 self.selected = (self.selected - 1) % len(self.settings_items)
+                self._ensure_selected_visible(len(self.settings_items))
             elif event.key == pygame.K_DOWN:
                 self.selected = (self.selected + 1) % len(self.settings_items)
+                self._ensure_selected_visible(len(self.settings_items))
             elif event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
                 self._toggle_setting(self.selected)
             elif event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:
@@ -729,6 +763,7 @@ class Menu:
             3: ('difficulty', ['easy', 'normal', 'hard']),
             4: ('ai_difficulty', ['easy', 'medium', 'hard']),
             5: ('skin_dino', ['dino', 'dino2', 'dino3']),
+            6: ('two_lane_map_mode', ['same', 'different']),
         }
 
         if index in toggles:
@@ -768,14 +803,23 @@ class Menu:
                             self._calculate_button_positions()
                             continue  # Thoát ra Main Menu lập tức
                         # ===================================
-                        for i, button_data in enumerate(self.button_rects):
-                            rect = button_data if not isinstance(button_data, tuple) else button_data[1]
+                        for button_data in self.button_rects:
+                            if isinstance(button_data, tuple):
+                                item_idx, rect = button_data
+                            else:
+                                item_idx, rect = 0, button_data
                             if rect.collidepoint(mouse_pos):
-                                if i == len(self.settings_items) - 1:  # Back button
+                                self.selected = item_idx
+                                if item_idx == len(self.settings_items) - 1:  # Back button
                                     self.current_menu = MENU_MAIN
                                     self.selected = 0
                                 else:
-                                    self._toggle_setting(i)
+                                    self._toggle_setting(item_idx)
+                    elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 4:
+                        self.scroll_offset = max(0, self.scroll_offset - 1)
+                    elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 5:
+                        max_scroll = max(0, len(self.settings_items) - self.max_visible_buttons)
+                        self.scroll_offset = min(max_scroll, self.scroll_offset + 1)
                     continue
                 
                 if self.current_menu == MENU_STATS:

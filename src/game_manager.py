@@ -336,6 +336,40 @@ class GameManager:
                 return True
         return False
 
+    def _create_lane_random_states(self, same_map=True):
+        """Tạo state random riêng cho 2 lane, có thể giống nhau hoặc khác nhau."""
+        base_seed = int(time.time() * 1000000)
+        lane1_rng = random.Random(base_seed)
+        lane1_state = lane1_rng.getstate()
+
+        if same_map:
+            lane2_state = lane1_state
+        else:
+            lane2_rng = random.Random(base_seed + 1)
+            lane2_state = lane2_rng.getstate()
+
+        return lane1_state, lane2_state
+
+    def _create_lane_with_random_state(self, lane_state, *args, **kwargs):
+        """Khởi tạo lane với random state cố định để đồng bộ map."""
+        from src.lane_game import LaneGame
+
+        previous_state = random.getstate()
+        random.setstate(lane_state)
+        lane = LaneGame(*args, **kwargs)
+        updated_state = random.getstate()
+        random.setstate(previous_state)
+        return lane, updated_state
+
+    def _update_lane_with_random_state(self, lane, lane_state, *args, **kwargs):
+        """Update lane với random state riêng, tránh 2 lane ảnh hưởng nhau."""
+        previous_state = random.getstate()
+        random.setstate(lane_state)
+        lane.update(*args, **kwargs)
+        updated_state = random.getstate()
+        random.setstate(previous_state)
+        return updated_state
+
     def update(self, action=None, speed_mult=1.0, jump_held=False):
         """
         Cập nhật game state.
@@ -811,8 +845,21 @@ class GameManager:
                     net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
                     ai_label = "AI (NEAT)"
 
-        ai_lane     = LaneGame('ai_dino', ai_label, label_color=(200, 150, 255), sword_key='T')
-        player_lane = LaneGame('dino',    'PLAYER',   label_color=(255, 230, 80), sword_key='T')
+        same_map = getattr(game_settings, 'two_lane_map_mode', 'same') == 'same'
+        ai_state, player_state = self._create_lane_random_states(same_map=same_map)
+
+        ai_lane, ai_state = self._create_lane_with_random_state(
+            ai_state,
+            'ai_dino', ai_label,
+            label_color=(200, 150, 255),
+            sword_key='T'
+        )
+        player_lane, player_state = self._create_lane_with_random_state(
+            player_state,
+            'dino', 'PLAYER',
+            label_color=(255, 230, 80),
+            sword_key='T'
+        )
         div = pygame.Surface((SCREEN_WIDTH, 4)); div.fill((255, 200, 50))
         font_hint = get_cached_font('Arial', 16)
         running = True
@@ -825,7 +872,20 @@ class GameManager:
                         if not player_lane.game_over: player_lane.dino.jump_press()
                     if event.key == pygame.K_DOWN:
                         if not player_lane.game_over: player_lane.dino.duck(True)
-                    if event.key == pygame.K_r: ai_lane.reset(); player_lane.reset()
+                    if event.key == pygame.K_r:
+                        ai_state, player_state = self._create_lane_random_states(same_map=same_map)
+                        ai_lane, ai_state = self._create_lane_with_random_state(
+                            ai_state,
+                            'ai_dino', ai_label,
+                            label_color=(200, 150, 255),
+                            sword_key='T'
+                        )
+                        player_lane, player_state = self._create_lane_with_random_state(
+                            player_state,
+                            'dino', 'PLAYER',
+                            label_color=(255, 230, 80),
+                            sword_key='T'
+                        )
                     if event.key == pygame.K_ESCAPE: running = False
                     if event.key == pygame.K_t:
                         if not player_lane.game_over: player_lane.sword_slash()
@@ -836,25 +896,33 @@ class GameManager:
 
             if not ai_lane.game_over:
                 if ai_type == 'neat' and net:
-                    ai_lane.update(action=net.activate(_get_inputs_from_lane(ai_lane)))
+                    ai_state = self._update_lane_with_random_state(
+                        ai_lane,
+                        ai_state,
+                        action=net.activate(_get_inputs_from_lane(ai_lane))
+                    )
                 elif ai_type == 'supervised' and jump_model and duck_model:
                     # Get inputs for supervised model
                     from src.ai_handler import _get_inputs
                     inputs = _get_inputs(ai_lane.dino, ai_lane.obstacles, ai_lane.game_speed)
                     action = predict_action(jump_model, jump_scaler, duck_model, duck_scaler, inputs)
-                    ai_lane.update(action=action[:2])  # Take first 2 values (jump, duck)
+                    ai_state = self._update_lane_with_random_state(
+                        ai_lane,
+                        ai_state,
+                        action=action[:2]
+                    )  # Take first 2 values (jump, duck)
                 elif ai_type == 'hybrid' and hybrid_ai:
                     # Hybrid AI prediction
                     from src.ai_handler import _get_inputs
                     inputs = _get_inputs(ai_lane.dino, ai_lane.obstacles, ai_lane.game_speed)
                     action = hybrid_ai.predict(inputs)
-                    ai_lane.update(action=action)
+                    ai_state = self._update_lane_with_random_state(ai_lane, ai_state, action=action)
                 else:
-                    ai_lane.update()
+                    ai_state = self._update_lane_with_random_state(ai_lane, ai_state)
             else:
-                ai_lane.update()
+                ai_state = self._update_lane_with_random_state(ai_lane, ai_state)
 
-            player_lane.update()
+            player_state = self._update_lane_with_random_state(player_lane, player_state)
             ai_lane.draw(); player_lane.draw()
             self.screen.blit(ai_lane.surface, (0, 0))
             self.screen.blit(div, (0, LANE_H))
@@ -868,24 +936,25 @@ class GameManager:
         from src.lane_game import LaneGame, LANE_H
         from src.utils import get_cached_font
 
-        # --- BƯỚC 1: TẠO MAP GIỐNG HỆT NHAU ---
-        # Tạo một hạt giống (seed) ngẫu nhiên cho ván đấu này
-        random.seed(time.time())
+        same_map = getattr(game_settings, 'two_lane_map_mode', 'same') == 'same'
+        p1_rand_state, p2_rand_state = self._create_lane_random_states(same_map=same_map)
 
-        # Lưu lại trạng thái của cỗ bài
-        shared_initial_state = random.getstate()
-
-        # Khởi tạo P1 (P1 sẽ rút vài lá bài để tạo mây)
-        p1 = LaneGame('dino', 'PLAYER 1', label_color=(255, 230, 80), collect_data=False, player_type="human", sword_key='T')  # Tắt data collection để tăng FPS
-        p1_rand_state = random.getstate()  # Cất cỗ bài của P1 đi
-
-        # Reset cỗ bài về trạng thái ban đầu cho P2
-        random.setstate(shared_initial_state)
-
-        # Khởi tạo P2 (Lúc này P2 sẽ rút được các lá bài tạo mây GIỐNG HỆT P1)
-        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255), collect_data=False, player_type="ai", sword_key='L')  # Tắt data collection để tăng FPS
-        p2_rand_state = random.getstate()  # Cất cỗ bài của P2 đi
-        # ---------------------------------------
+        p1, p1_rand_state = self._create_lane_with_random_state(
+            p1_rand_state,
+            'dino', 'PLAYER 1',
+            label_color=(255, 230, 80),
+            collect_data=False,
+            player_type="human",
+            sword_key='T'
+        )
+        p2, p2_rand_state = self._create_lane_with_random_state(
+            p2_rand_state,
+            'ai_dino', 'PLAYER 2',
+            label_color=(200, 150, 255),
+            collect_data=False,
+            player_type="ai",
+            sword_key='L'
+        )
 
         div = pygame.Surface((SCREEN_WIDTH, 4))
         div.fill((255, 200, 50))
@@ -941,8 +1010,23 @@ class GameManager:
                         if p2_keys['duck']:
                             p2.dino.duck(False)
 
-                        p1.reset()
-                        p2.reset()
+                        p1_rand_state, p2_rand_state = self._create_lane_random_states(same_map=same_map)
+                        p1, p1_rand_state = self._create_lane_with_random_state(
+                            p1_rand_state,
+                            'dino', 'PLAYER 1',
+                            label_color=(255, 230, 80),
+                            collect_data=False,
+                            player_type="human",
+                            sword_key='T'
+                        )
+                        p2, p2_rand_state = self._create_lane_with_random_state(
+                            p2_rand_state,
+                            'ai_dino', 'PLAYER 2',
+                            label_color=(200, 150, 255),
+                            collect_data=False,
+                            player_type="ai",
+                            sword_key='L'
+                        )
                         p1_keys = {'jump': False, 'duck': False}
                         p2_keys = {'jump': False, 'duck': False}
                         p1_surface_cache = None
@@ -981,9 +1065,7 @@ class GameManager:
 
             # Chỉ update P1 nếu chưa game over
             if not p1.game_over:
-                random.setstate(p1_rand_state)
-                p1.update()
-                p1_rand_state = random.getstate()
+                p1_rand_state = self._update_lane_with_random_state(p1, p1_rand_state)
             else:
                 # P1 đã chết, vẽ lại surface cuối cùng và cache lại
                 if p1_surface_cache is None:
@@ -992,9 +1074,7 @@ class GameManager:
 
             # Chỉ update P2 nếu chưa game over
             if not p2.game_over:
-                random.setstate(p2_rand_state)
-                p2.update()
-                p2_rand_state = random.getstate()
+                p2_rand_state = self._update_lane_with_random_state(p2, p2_rand_state)
             else:
                 # P2 đã chết, vẽ lại surface cuối cùng và cache lại
                 if p2_surface_cache is None:
