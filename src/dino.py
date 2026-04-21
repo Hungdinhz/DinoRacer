@@ -23,6 +23,12 @@ DINO_COLOR = game_settings.DINO_COLOR
 GROUND_Y = game_settings.GROUND_Y
 GRAVITY = game_settings.GRAVITY
 JUMP_VELOCITY = game_settings.JUMP_VELOCITY
+SWORD_SLASH_FRAMES = getattr(game_settings, 'SWORD_SLASH_FRAMES', 7)
+SWORD_SLASH_FRAME_SPEED = getattr(game_settings, 'SWORD_SLASH_FRAME_SPEED', 3)
+SWORD_SLASH_WIDTH = getattr(game_settings, 'SWORD_SLASH_WIDTH', 180)
+SWORD_SLASH_HEIGHT = getattr(game_settings, 'SWORD_SLASH_HEIGHT', 120)
+SWORD_SLASH_OFFSET_X = getattr(game_settings, 'SWORD_SLASH_OFFSET_X', -5)
+SWORD_SLASH_OFFSET_Y = getattr(game_settings, 'SWORD_SLASH_OFFSET_Y', -10)
 JUMP_HOLD_GRAVITY = getattr(game_settings, 'JUMP_HOLD_GRAVITY', GRAVITY)
 JUMP_MIN_VELOCITY = getattr(game_settings, 'JUMP_MIN_VELOCITY', -8)
 COYOTE_TIME = getattr(game_settings, 'COYOTE_TIME', 6)
@@ -80,6 +86,11 @@ class Dino:
         self._trail_color = (200, 200, 200, 80)  # Màu trail (RGBA)
         self._last_x = self.x
         self._last_y = self.y
+
+        # Hiệu ứng chém kiếm
+        self.slash_effect_active: bool = False
+        self.slash_effect_frame: int = 0
+        self.slash_effect_timer: int = 0
 
     def _anim_name(self):
         if self.is_jumping:
@@ -143,6 +154,27 @@ class Dino:
         self._scale_x += (1.0 - self._scale_x) * self._scale_lerp_speed
         self._scale_y += (1.0 - self._scale_y) * self._scale_lerp_speed
 
+    def start_sword_slash(self):
+        """Bắt đầu animation hiệu ứng chém kiếm."""
+        self.slash_effect_active = True
+        self.slash_effect_frame = 0
+        self.slash_effect_timer = 0
+
+    def _update_slash_effect(self):
+        """Cập nhật frame của hiệu ứng chém kiếm."""
+        if not self.slash_effect_active:
+            return
+
+        self.slash_effect_timer += 1
+        if self.slash_effect_timer < SWORD_SLASH_FRAME_SPEED:
+            return
+
+        self.slash_effect_timer = 0
+        self.slash_effect_frame += 1
+        if self.slash_effect_frame >= SWORD_SLASH_FRAMES:
+            self.slash_effect_active = False
+            self.slash_effect_frame = 0
+
     def update(self, jump_held=False):
         was_on_ground = self.is_on_ground
 
@@ -205,6 +237,8 @@ class Dino:
             if self.anim_timer >= _ANIM_SPEED.get(anim, 8):
                 self.anim_timer = 0
                 self.anim_frame = (self.anim_frame + 1) % _ANIM_FRAMES.get(anim, 1)
+
+        self._update_slash_effect()
 
     def get_rect(self):
         # Tạo khung hình chữ nhật ban đầu bao quanh toàn bộ bức ảnh
@@ -299,3 +333,21 @@ class Dino:
             eye_y = y + 12
             pygame.draw.circle(screen, (255, 255, 255), (eye_x, eye_y), 4)
             pygame.draw.circle(screen, (0, 0, 0), (eye_x + 1, eye_y), 2)
+
+        if self.slash_effect_active:
+            slash_frames = get_sheet(
+                "dino/slash_sword.png",
+                SWORD_SLASH_FRAMES,
+                SWORD_SLASH_WIDTH,
+                SWORD_SLASH_HEIGHT
+            )
+            if slash_frames:
+                idx = min(self.slash_effect_frame, len(slash_frames) - 1)
+                slash_frame = slash_frames[idx]
+                slash_x = int(self.x + self.width - (SWORD_SLASH_WIDTH * 0.35) + SWORD_SLASH_OFFSET_X)
+                slash_y = int(
+                    self.y + (self.height - SWORD_SLASH_HEIGHT) * 0.5 + SWORD_SLASH_OFFSET_Y
+                )
+                if self.is_ducking:
+                    slash_y += int(self.height * 0.15)
+                screen.blit(slash_frame, (slash_x, slash_y))

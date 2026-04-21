@@ -266,7 +266,7 @@ class UILayer:
         return self.pause_btn.collidepoint(pos)
     
     # Trong class UILayer (file ui.py)
-    def draw_buffs(self, speed_timer, max_speed, x2_timer, max_x2, sword_charges, has_shield):
+    def draw_buffs(self, speed_timer, max_speed, x2_timer, max_x2, sword_charges, has_shield, sword_key="T"):
         """Vẽ thanh thời gian cho các buff đang kích hoạt"""
         start_x = 20  # Vẽ ở góc trên bên trái màn hình
         start_y = 20
@@ -307,13 +307,18 @@ class UILayer:
         # 3. Vẽ Số lần chém Kiếm (Text đơn giản)
         if sword_charges > 0:
             # Bạn có thể thay bằng icon thanh kiếm nếu đã load ảnh ở assets
-            sword_text = self.font_med.render(f"Swords: {sword_charges} (press T to use)", True, (255, 100, 100))
+            sword_text = self.font_med.render(
+                f"Swords: {sword_charges} (press {sword_key} to use)",
+                True,
+                (255, 100, 100)
+            )
             self.screen.blit(sword_text, (start_x, current_y))
         
         if has_shield:
             shield_text = self.font_med.render("Shield: ACTIVE", True, (0, 191, 255))
             self.screen.blit(shield_text, (start_x, current_y + 30))
         
+
 
 
 

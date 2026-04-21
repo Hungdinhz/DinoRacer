@@ -95,12 +95,14 @@ class LaneGame:
     """
 
     def __init__(self, dino_folder="dino", label="PLAYER",
-                 label_color=(255, 230, 80), collect_data=False, player_type="human"):
+                 label_color=(255, 230, 80), collect_data=False, player_type="human",
+                 sword_key="T"):
         self.dino_folder = dino_folder
         self.label = label
         self.label_color = label_color
         self.collect_data = collect_data
         self.player_type = player_type
+        self.sword_key = sword_key
 
         self.surface = pygame.Surface((LANE_W, LANE_H))
 
@@ -239,8 +241,15 @@ class LaneGame:
         """Chém chướng ngại vật phía trước mặt dino (tầm 150px)."""
         if self.dino.sword_charges <= 0:
             return
+
+        from src.obstacle import Bird
+
+        self.dino.start_sword_slash()
         dino_right = self.dino.x + self.dino.width
+        dino_y = self.dino.y
         for obs in self.obstacles:
+            if isinstance(obs, Bird) and (dino_y - obs.y) > 50:
+                continue
             if 0 < (obs.x - dino_right) < 150:
                 self.obstacles.remove(obs)
                 self.dino.sword_charges -= 1
@@ -336,6 +345,7 @@ class LaneGame:
     def update(self, action=None, player_action=None):
         if self.game_over:
             self.go_flash_timer += 1
+            self.update_notifications()
             # Chỉ save data một lần khi mới game over
             if self.collect_data and hasattr(self, '_data_saved') and not self._data_saved:
                 if len(get_collector().current_session_data) > 0:
@@ -420,20 +430,29 @@ class LaneGame:
         # 2. Update items and collect
         dino_rect = self.get_dino_rect()
         for item in self.items:
-            item.x -= item.speed * current_speed_multiplier
+            old_x = item.x
+            item.update()
+            item.x = old_x - item.speed * current_speed_multiplier
             if dino_rect.colliderect(item.get_rect()) and not item.is_collected:
                 item.is_collected = True
                 if isinstance(item, Shield):
                     self.dino.has_shield = True
+                    self.add_notification("SHIELD!", (0, 191, 255))
                 elif isinstance(item, SpeedItem):
                     self.speed_buff_timer = MAX_SPEED_TIME
+                    self.add_notification("SPEED UP!", (0, 255, 255))
                 elif isinstance(item, X2Item):
                     self.x2_buff_timer = MAX_X2_TIME
+                    self.add_notification("x2 GOLD!", (255, 215, 0))
                 elif isinstance(item, SwordItem):
                     self.dino.sword_charges += PLUS_COUNT_SWORD
+                    self.add_notification(f"+{PLUS_COUNT_SWORD} SWORD!", (255, 100, 100))
                 else:
                     multiplier = 2 if self.x2_buff_timer > 0 else 1
-                    self.score += getattr(item, 'bonus_points', 10) * multiplier
+                    bonus = getattr(item, 'bonus_points', 10) * multiplier
+                    self.score += bonus
+                    self.add_notification(f"+{bonus}", (255, 230, 80), duration=45)
+
 
         self.items = [i for i in self.items if not i.is_off_screen() and not i.is_collected]
         self.last_item_x = max([i.x for i in self.items if not isinstance(i, Coin)], default=0)
@@ -464,6 +483,8 @@ class LaneGame:
             play_sound("gameover")
             if self.collect_data:
                 get_collector().save_session_data()
+
+        self.update_notifications()
         
         self.frame_count += 1
         self._collect_data(actual_action)
@@ -518,6 +539,17 @@ class LaneGame:
 
         for item in self.items:
             item.draw(surf)
+
+        self.draw_notifications(surf)
+
+        # Buff HUD ở góc trái (thời gian tồn tại buff)
+        self.ui.draw_buffs(
+            self.speed_buff_timer, MAX_SPEED_TIME,
+            self.x2_buff_timer, MAX_X2_TIME,
+            self.dino.sword_charges,
+            self.dino.has_shield,
+            self.sword_key,
+        )
 
         lbl = self.font_label.render(self.label, True, self.label_color)
         surf.blit(lbl, (8, 6))
