@@ -807,7 +807,9 @@ class GameManager:
         div = pygame.Surface((SCREEN_WIDTH, 4)); div.fill((255, 200, 50))
         font_hint = get_cached_font('Arial', 16)
         running = True
-
+        game_ended = False
+        match_result = None
+        
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: running = False
@@ -816,7 +818,7 @@ class GameManager:
                         if not player_lane.game_over: player_lane.dino.jump_press()
                     if event.key == pygame.K_DOWN:
                         if not player_lane.game_over: player_lane.dino.duck(True)
-                    if event.key == pygame.K_r: ai_lane.reset(); player_lane.reset()
+                    if event.key == pygame.K_r: ai_lane.reset(); player_lane.reset(); game_ended = False; match_result = None
                     if event.key == pygame.K_ESCAPE: running = False
                 if event.type == pygame.KEYUP:
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
@@ -844,10 +846,49 @@ class GameManager:
                 ai_lane.update()
 
             player_lane.update()
-            ai_lane.draw(); player_lane.draw()
+            if not game_ended:
+                if ai_lane.game_over and player_lane.game_over:
+                    if player_lane.score > ai_lane.score:
+                        match_result = "YOU WIN!"
+                    elif ai_lane.score > player_lane.score:
+                        match_result = "AI WINS!"
+                    else:
+                        match_result = "DRAW!"
+                    game_ended = True
+            ai_lane.draw(show_go=False) 
+            player_lane.draw(show_go=False)
             self.screen.blit(ai_lane.surface, (0, 0))
             self.screen.blit(div, (0, LANE_H))
             self.screen.blit(player_lane.surface, (0, LANE_H + 4))
+            if game_ended:
+                # 1. Phủ mờ toàn màn hình
+                ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+                ov.fill((0, 0, 0, 180))
+                self.screen.blit(ov, (0, 0))
+
+                # 2. Vẽ khung bảng ở giữa
+                pw, ph = 420, 220
+                px, py = SCREEN_WIDTH // 2 - pw // 2, (LANE_H * 2 + 4) // 2 - ph // 2
+                panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
+                panel.fill((20, 25, 30, 240))
+                self.screen.blit(panel, (px, py))
+                pygame.draw.rect(self.screen, (255, 215, 0), (px, py, pw, ph), 3, border_radius=12)
+
+                # 3. Vẽ chữ kết quả
+                font_result = get_cached_font('impact', 50)
+                font_score = get_cached_font('Arial', 24, bold=True)
+                
+                # Màu chữ tùy theo kết quả
+                title_col = (255, 230, 80) if "YOU" in match_result else (200, 150, 255) if "AI" in match_result else (200, 200, 200)
+                
+                res_txt = font_result.render(match_result, True, title_col)
+                self.screen.blit(res_txt, res_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 50)))
+
+                p_txt = font_score.render(f"Your Score: {player_lane.score:05d}", True, (255, 230, 80))
+                self.screen.blit(p_txt, p_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 110)))
+
+                ai_txt = font_score.render(f"AI Score: {ai_lane.score:05d}", True, (200, 150, 255))
+                self.screen.blit(ai_txt, ai_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 150)))
             if ai_lane.game_over or player_lane.game_over:
                 hint = font_hint.render('R - Retry  |  ESC - Menu', True, (220, 220, 220))
                 self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, LANE_H * 2 + 4 - 12)))
@@ -892,6 +933,8 @@ class GameManager:
         p1_surface_cache = None
         p2_surface_cache = None
         both_game_over_drawn = False
+        game_ended = False
+        match_result = None
 
         while running:
             # Đọc phím liên tục mỗi frame
@@ -948,6 +991,8 @@ class GameManager:
                         p1_surface_cache = None
                         p2_surface_cache = None
                         both_game_over_drawn = False
+                        game_ended = False
+                        match_result = None
                     if event.key == pygame.K_ESCAPE:
                         running = False
 
@@ -961,7 +1006,7 @@ class GameManager:
             else:
                 # P1 đã chết, vẽ lại surface cuối cùng và cache lại
                 if p1_surface_cache is None:
-                    p1.draw()
+                    p1.draw(show_go=False)
                     p1_surface_cache = p1.surface.copy()
 
             # Chỉ update P2 nếu chưa game over
@@ -972,10 +1017,24 @@ class GameManager:
             else:
                 # P2 đã chết, vẽ lại surface cuối cùng và cache lại
                 if p2_surface_cache is None:
-                    p2.draw()
+                    p2.draw(show_go=False)
                     p2_surface_cache = p2.surface.copy()
 
             # --- KẾT THÚC BƯỚC 2 ---
+
+            # THÊM ĐOẠN LOGIC PHÂN ĐỊNH THẮNG THUA Ở ĐÂY
+            if not game_ended:
+                # Trường hợp 2 & 3: Cả 2 cùng chết
+                if p1.game_over and p2.game_over:
+                    if p1.score > p2.score:
+                        match_result = "PLAYER 1 WINS!"
+                    elif p2.score > p1.score:
+                        match_result = "PLAYER 2 WINS!"
+                    else:
+                        match_result = "DRAW!"
+                    game_ended = True
+
+            # ==========================================
 
             # Draw - sử dụng cache nếu đã game over
             if p1_surface_cache is not None:
@@ -992,29 +1051,39 @@ class GameManager:
                 p2.draw()
                 self.screen.blit(p2.surface, (0, LANE_H + 4))
 
-            # Hiển thị kết quả khi cả hai game over
-            if p1.game_over and p2.game_over:
-                if not both_game_over_drawn:
-                    if p1.score > p2.score:
-                        msg, col = f'P1 THẮNG! ({p1.score} vs {p2.score})', (255, 230, 80)
-                    elif p2.score > p1.score:
-                        msg, col = f'P2 THẮNG! ({p2.score} vs {p1.score})', (200, 150, 255)
-                    else:
-                        msg, col = f'HÒA! ({p1.score})', (200, 200, 200)
-                    res = font_res.render(msg, True, col)
-                    self.screen.blit(res, res.get_rect(center=(SCREEN_WIDTH // 2, LANE_H + 2)))
-                    both_game_over_drawn = True
-                else:
-                    # Vẽ lại kết quả đã cache
-                    if p1.score > p2.score:
-                        msg, col = f'P1 THẮNG! ({p1.score} vs {p2.score})', (255, 230, 80)
-                    elif p2.score > p1.score:
-                        msg, col = f'P2 THẮNG! ({p2.score} vs {p1.score})', (200, 150, 255)
-                    else:
-                        msg, col = f'HÒA! ({p1.score})', (200, 200, 200)
-                    res = font_res.render(msg, True, col)
-                    self.screen.blit(res, res.get_rect(center=(SCREEN_WIDTH // 2, LANE_H + 2)))
+            # VẼ BẢNG KẾT QUẢ TỔNG
+            if game_ended:
+                # 1. Phủ mờ màn hình
+                ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+                ov.fill((0, 0, 0, 180))
+                self.screen.blit(ov, (0, 0))
 
+                # 2. Vẽ khung bảng kết quả ở giữa màn hình
+                pw, ph = 420, 220
+                px = SCREEN_WIDTH // 2 - pw // 2
+                py = SCREEN_HEIGHT // 2 - ph // 2
+                panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
+                panel.fill((20, 25, 30, 240))
+                self.screen.blit(panel, (px, py))
+                pygame.draw.rect(self.screen, (255, 215, 0), (px, py, pw, ph), 3, border_radius=12)
+
+                # 3. Vẽ text kết quả
+                font_result = get_cached_font('impact', 50)
+                font_score = get_cached_font('Arial', 24, bold=True)
+                
+                # Màu chữ tiêu đề tùy theo ai thắng
+                title_col = (255, 230, 80) if "1" in match_result else (200, 150, 255) if "2" in match_result else (200, 200, 200)
+                
+                res_txt = font_result.render(match_result, True, title_col)
+                self.screen.blit(res_txt, res_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 50)))
+
+                p1_txt = font_score.render(f"P1 Score: {p1.score:05d}", True, (255, 230, 80))
+                self.screen.blit(p1_txt, p1_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 110)))
+
+                p2_txt = font_score.render(f"P2 Score: {p2.score:05d}", True, (200, 150, 255))
+                self.screen.blit(p2_txt, p2_txt.get_rect(center=(SCREEN_WIDTH // 2, py + 150)))
+            # ==========================================
+            
             # Hiển thị hint điều khiển
             hint = font_hint.render('P1: W=Jump, S=Duck  |  P2: Up=Jump, Down=Duck  |  R=Retry  |  ESC=Menu', True, (220, 220, 220))
             self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)))
