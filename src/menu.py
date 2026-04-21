@@ -790,16 +790,37 @@ class Menu:
     def run(self):
         running = True
         clock = pygame.time.Clock()
-        
+        from src.assets_loader import play_sound
+        self.last_hovered = None
         while running:
+            old_selected = getattr(self, 'selected', 0)
             self.draw()
             clock.tick(60)
+            mouse_pos = pygame.mouse.get_pos()
             
+            # 1. Mặc định: Lấy vị trí nút trong danh sách đang được chọn
+            current_target = self.selected  
+            
+            # 2. Ghi đè: Nếu chuột nằm trên các Icon đặc biệt
+            if hasattr(self, 'info_btn_rect') and self.info_btn_rect.collidepoint(mouse_pos) and self.current_menu == MENU_MAIN:
+                current_target = "icon_info"
+            elif hasattr(self, 'gear_rect') and self.gear_rect.collidepoint(mouse_pos) and self.current_menu == MENU_MAIN:
+                current_target = "icon_gear"
+            elif hasattr(self, 'back_arrow_rect') and self.back_arrow_rect.collidepoint(mouse_pos) and self.current_menu == MENU_SETTINGS:
+                current_target = "icon_back_arrow"
+
+            # 3. Phát tiếng Hover nếu mục tiêu thực sự thay đổi
+            if current_target != self.last_hovered:
+                if self.last_hovered is not None:  # Bỏ qua âm thanh ở khung hình đầu tiên lúc mới mở game
+                    play_sound("menu_hover")
+                self.last_hovered = current_target
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                
+                if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1) or \
+                   (event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN):
+                    play_sound("menu_click")
                 if self.current_menu == MENU_SETTINGS:
                     self.handle_settings_input(event)
                     # Also handle mouse click in settings
@@ -986,3 +1007,5 @@ class Menu:
                             self.selected = 0
                         else:
                             return choice
+            if self.selected != old_selected:
+                play_sound("menu_hover")
