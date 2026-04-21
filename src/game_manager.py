@@ -874,7 +874,20 @@ class GameManager:
                         if not player_lane.game_over: player_lane.dino.jump_press()
                     if event.key == pygame.K_DOWN:
                         if not player_lane.game_over: player_lane.dino.duck(True)
-                    if event.key == pygame.K_r: ai_lane.reset(); player_lane.reset()
+                    if event.key == pygame.K_r:
+                        ai_state, player_state = self._create_lane_random_states(same_map=same_map)
+                        ai_lane, ai_state = self._create_lane_with_random_state(
+                            ai_state,
+                            'ai_dino', ai_label,
+                            label_color=(200, 150, 255),
+                            sword_key='T'
+                        )
+                        player_lane, player_state = self._create_lane_with_random_state(
+                            player_state,
+                            'dino', 'PLAYER',
+                            label_color=(255, 230, 80),
+                            sword_key='T'
+                        ) 
                     if event.key == pygame.K_ESCAPE: running = False
                     if event.key == pygame.K_t:
                         if not player_lane.game_over: player_lane.sword_slash()
@@ -911,7 +924,7 @@ class GameManager:
             else:
                 ai_state = self._update_lane_with_random_state(ai_lane, ai_state)
 
-            player_lane.update()
+            player_state = self._update_lane_with_random_state(player_lane, player_state)
             ai_lane.draw(); player_lane.draw()
             self.screen.blit(ai_lane.surface, (0, 0))
             self.screen.blit(div, (0, LANE_H))
