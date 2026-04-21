@@ -769,6 +769,15 @@ class Menu:
         if index in toggles:
             key, toggle_func = toggles[index]
             setattr(settings, key, toggle_func(settings))
+            if key == 'music_enabled':
+                if getattr(settings, 'music_enabled'):
+                    try:
+                        pygame.mixer.music.load("assets/sounds/music_menu.wav")
+                        pygame.mixer.music.set_volume(0.5)
+                        pygame.mixer.music.play(-1)
+                    except: pass
+                else:
+                    pygame.mixer.music.stop()
         elif index in cycles:
             key, values = cycles[index]
             current = getattr(settings, key)

@@ -12,7 +12,7 @@ from src.ai_handler import (
     get_config_path,
     load_genome,
 )
-from src.assets_loader import clear_sheet_cache, preload_item_sprites
+from src.assets_loader import clear_sheet_cache
 from src.utils import get_cached_font
 from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
 
@@ -43,8 +43,6 @@ def main():
 
     # Xóa cache sprite để load lại với kích thước mới
     clear_sheet_cache()
-    # Pre-load tất cả item sprite một lần tránh lag khi spawn
-    preload_item_sprites()
 
     # Biến theo dõi fullscreen
     is_fullscreen = [False]
@@ -102,10 +100,27 @@ def main():
         game_settings.SCREEN_WIDTH = current_width
         game_settings.SCREEN_HEIGHT = current_height
         
+        if settings.music_enabled:  
+            try:
+                pygame.mixer.music.load("assets/sounds/music_menu.wav")
+                pygame.mixer.music.set_volume(0.3)
+                pygame.mixer.music.play(-1)
+            except Exception :
+                print("Không tìm thấy file nhạc Menu:")
+        
         # Tạo và chạy menu
         menu = Menu(screen)
         choice = menu.run()
-
+        pygame.mixer.music.stop()
+        game_modes = ['Classic', 'Time Attack', 'Endless', 'PVE(VS AI)', 'PVP(VS PLAYER)']
+        if choice in game_modes:
+            if settings.music_enabled:  
+                try:
+                    pygame.mixer.music.load("assets/sounds/music_gameplay.wav")
+                    pygame.mixer.music.set_volume(0.2)
+                    pygame.mixer.music.play(-1)
+                except Exception :
+                    print("Không tìm thấy file nhạc Gameplay:")
         if choice == 'Classic':
             # Chế độ chơi thường một mình - Sử dụng GameManager với human mode
             game = GameManager(screen, is_ai_mode=False)
@@ -133,29 +148,24 @@ def main():
             game.run_pvp_mode()
             
         elif choice == 'NEAT Training' or choice == 'Train AI':
-            print("Bat dau NEAT Visual Training... (ESC de dung, S de skip gen, R de reset)")
+            print("Bắt đầu NEAT Visual Training... (ESC để dừng, S để skip gen)")
             try:
-                from src.neat_visual import run_neat_visual, load_best_model
-                from src.ai_handler import get_config_path as ai_config_path
-
-                winner, config = run_neat_visual(screen, ai_config_path(), generations=50)
+                from src.neat_visual import run_neat_visual
+                winner, config = run_neat_visual(screen, get_config_path(), generations=50)
                 if winner:
-                    print("\nTraining xong! Chay AI tot nhat...")
-                    genome, cfg = load_best_model()
-                    if genome and cfg:
-                        run_best_genome_display(genome, cfg)
-                    else:
-                        print("Khong load duoc model - thu lai training!")
+                    from src.ai_handler import save_genome
+                    save_genome(winner)
+                    print("\nTraining xong! Chạy AI tốt nhất...")
+                    run_best_genome_display(winner, config)
             except Exception as e:
-                import traceback
-                traceback.print_exc()
-                print(f"Loi Visual Training: {e}")
-                # Fallback ve silent training
+                print(f"Lỗi Visual Training: {e}")
+                # Fallback về silent training
                 winner = run_neat_training(generations=20)
                 if winner:
-                    genome, config = load_genome()
-                    if genome and config:
-                        run_best_genome_display(genome, config)
+                    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                        neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                        get_config_path())
+                    run_best_genome_display(winner, config)
 
         elif choice == 'Supervised Training':
             print("Bắt đầu Supervised Learning training...")

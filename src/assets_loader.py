@@ -204,6 +204,9 @@ def play_sound(name, volume=1.0):
     Phát âm thanh với mức âm lượng tùy chỉnh.
     volume: từ 0.0 (im lặng) đến 1.0 (to nhất mặc định)
     """
+    from src.menu import settings
+    if not settings.sound_enabled:
+        return
     s = get_sound(name)
     if s:
         try:
