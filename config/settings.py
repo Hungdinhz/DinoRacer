@@ -24,6 +24,12 @@ DINO_WIDTH = 80
 DINO_HEIGHT = 80
 GRAVITY = 0.8           # Gravity nhẹ hơn cho cảm giác nhảy mượt hơn
 JUMP_VELOCITY = -15
+SWORD_SLASH_FRAMES = 7
+SWORD_SLASH_FRAME_SPEED = 3
+SWORD_SLASH_WIDTH = 180
+SWORD_SLASH_HEIGHT = 120
+SWORD_SLASH_OFFSET_X = -5
+SWORD_SLASH_OFFSET_Y = -10
 
 # Smooth physics - Giúp cảm giác nhảy mượt mà hơn
 JUMP_HOLD_GRAVITY = 0.4  # Gravity khi giữ nút nhảy (nhảy cao hơn)

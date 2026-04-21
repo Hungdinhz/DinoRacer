@@ -317,6 +317,25 @@ class GameManager:
                     self.game_over = True
         return False
 
+    def sword_slash(self):
+        """Kích hoạt chém kiếm và phá chướng ngại vật ở tầm gần phía trước dino."""
+        if self.dino.sword_charges <= 0:
+            return False
+
+        from src.obstacle import Bird
+
+        self.dino.start_sword_slash()
+        dino_right = self.dino.get_rect().right
+        dino_y = self.dino.y
+        for obs in self.obstacles:
+            if isinstance(obs, Bird) and (dino_y - obs.y) > 50:
+                continue
+            if 0 < (obs.x - dino_right) < 150:
+                self.obstacles.remove(obs)
+                self.dino.sword_charges -= 1
+                return True
+        return False
+
     def update(self, action=None, speed_mult=1.0, jump_held=False):
         """
         Cập nhật game state.
@@ -635,7 +654,8 @@ class GameManager:
             self.speed_buff_timer, MAX_SPEED_TIME, 
             self.x2_buff_timer, MAX_X2_TIME, 
             self.dino.sword_charges,
-            self.dino.has_shield
+            self.dino.has_shield,
+            "T"
         )
 
         pygame.display.flip()
@@ -662,20 +682,6 @@ class GameManager:
                     speed_mult = 0.5   # A: chậm 50%
                 elif keys[pygame.K_d]:
                     speed_mult = 1.5   # D: nhanh 150%
-                # Nếu bấm T VÀ còn lượt dùng kiếm
-                elif keys[pygame.K_t] and self.dino.sword_charges > 0:
-                    
-                    # Tìm xem có chướng ngại vật nào đang ở TRƯỚC MẶT khủng long không (khoảng cách tầm 150 pixel)
-                    for obs in self.obstacles:
-                        # Nếu khoảng cách từ khủng long đến chướng ngại vật nằm trong tầm chém
-                        if 0 < (obs.x - self.dino.get_rect().right) < 150:
-                            # Tiêu diệt chướng ngại vật đó!
-                            self.obstacles.remove(obs)
-                            self.dino.sword_charges -= 1 # Trừ 1 lần chém
-                            
-                            # (Tùy chọn) Thêm âm thanh chém kiếm hoặc sinh ra tia lửa ở vị trí obs.x
-                            # play_sound("sword_slash")
-                            break # Chém trúng 1 cái là dừng vòng lặp, chờ bấm T lần sau mới chém tiếp
 
                 # Track trạng thái jump key
                 jump_held = keys[pygame.K_SPACE] or keys[pygame.K_UP]
@@ -694,6 +700,9 @@ class GameManager:
                     if event.key == pygame.K_p:
                         if not self.game_over:
                             self.toggle_pause()
+                    if event.key == pygame.K_t:
+                        if not self.game_over and not self.paused:
+                            self.sword_slash()
                     if event.key == pygame.K_r and self.game_over:
                         self.reset()
                     if event.key == pygame.K_ESCAPE and self.game_over:
@@ -802,8 +811,8 @@ class GameManager:
                     net = neat.nn.FeedForwardNetwork.create(genome, config) if genome else None
                     ai_label = "AI (NEAT)"
 
-        ai_lane     = LaneGame('ai_dino', ai_label, label_color=(200, 150, 255))
-        player_lane = LaneGame('dino',    'PLAYER',   label_color=(255, 230, 80))
+        ai_lane     = LaneGame('ai_dino', ai_label, label_color=(200, 150, 255), sword_key='T')
+        player_lane = LaneGame('dino',    'PLAYER',   label_color=(255, 230, 80), sword_key='T')
         div = pygame.Surface((SCREEN_WIDTH, 4)); div.fill((255, 200, 50))
         font_hint = get_cached_font('Arial', 16)
         running = True
@@ -820,6 +829,8 @@ class GameManager:
                         if not player_lane.game_over: player_lane.dino.duck(True)
                     if event.key == pygame.K_r: ai_lane.reset(); player_lane.reset(); game_ended = False; match_result = None
                     if event.key == pygame.K_ESCAPE: running = False
+                    if event.key == pygame.K_t:
+                        if not player_lane.game_over: player_lane.sword_slash()
                 if event.type == pygame.KEYUP:
                     if event.key in (pygame.K_SPACE, pygame.K_UP):
                         player_lane.dino.jump_release()
@@ -906,14 +917,14 @@ class GameManager:
         shared_initial_state = random.getstate()
 
         # Khởi tạo P1 (P1 sẽ rút vài lá bài để tạo mây)
-        p1 = LaneGame('dino', 'PLAYER 1', label_color=(255, 230, 80), collect_data=False, player_type="human")  # Tắt data collection để tăng FPS
+        p1 = LaneGame('dino', 'PLAYER 1', label_color=(255, 230, 80), collect_data=False, player_type="human", sword_key='T')  # Tắt data collection để tăng FPS
         p1_rand_state = random.getstate()  # Cất cỗ bài của P1 đi
 
         # Reset cỗ bài về trạng thái ban đầu cho P2
         random.setstate(shared_initial_state)
 
         # Khởi tạo P2 (Lúc này P2 sẽ rút được các lá bài tạo mây GIỐNG HỆT P1)
-        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255), collect_data=False, player_type="ai")  # Tắt data collection để tăng FPS
+        p2 = LaneGame('ai_dino', 'PLAYER 2', label_color=(200, 150, 255), collect_data=False, player_type="ai", sword_key='L')  # Tắt data collection để tăng FPS
         p2_rand_state = random.getstate()  # Cất cỗ bài của P2 đi
         # ---------------------------------------
 
@@ -937,53 +948,42 @@ class GameManager:
         match_result = None
 
         while running:
-            # Đọc phím liên tục mỗi frame
-            keys = pygame.key.get_pressed()
-
-            # P1: W = Jump, S = Duck (chỉ xử lý nếu chưa game over)
-            if not p1.game_over:
-                if keys[pygame.K_w]:
-                    if not p1_keys['jump']:
-                        p1.dino.jump_press()
-                        p1_keys['jump'] = True
-                else:
-                    if p1_keys['jump']:
-                        p1.dino.jump_release()
-                        p1_keys['jump'] = False
-
-                if keys[pygame.K_s]:
-                    p1.dino.duck(True)
-                    p1_keys['duck'] = True
-                else:
-                    if p1_keys['duck']:
-                        p1.dino.duck(False)
-                        p1_keys['duck'] = False
-
-            # P2: Up = Jump, Down = Duck (chỉ xử lý nếu chưa game over)
-            if not p2.game_over:
-                if keys[pygame.K_UP]:
-                    if not p2_keys['jump']:
-                        p2.dino.jump_press()
-                        p2_keys['jump'] = True
-                else:
-                    if p2_keys['jump']:
-                        p2.dino.jump_release()
-                        p2_keys['jump'] = False
-
-                if keys[pygame.K_DOWN]:
-                    p2.dino.duck(True)
-                    p2_keys['duck'] = True
-                else:
-                    if p2_keys['duck']:
-                        p2.dino.duck(False)
-                        p2_keys['duck'] = False
-
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                 if event.type == pygame.KEYDOWN:
+                    # P1: W = Jump, S = Duck
+                    if event.key == pygame.K_w and not p1.game_over:
+                        if not p1_keys['jump']:
+                            p1.dino.jump_press()
+                            p1_keys['jump'] = True
+                    if event.key == pygame.K_s and not p1.game_over:
+                        if not p1_keys['duck']:
+                            p1.dino.duck(True)
+                            p1_keys['duck'] = True
+
+                    # P2: Up = Jump, Down = Duck
+                    if event.key == pygame.K_UP and not p2.game_over:
+                        if not p2_keys['jump']:
+                            p2.dino.jump_press()
+                            p2_keys['jump'] = True
+                    if event.key == pygame.K_DOWN and not p2.game_over:
+                        if not p2_keys['duck']:
+                            p2.dino.duck(True)
+                            p2_keys['duck'] = True
+
                     # Game controls
                     if event.key == pygame.K_r:
+                        # Reset trạng thái input để tránh kẹt phím
+                        if p1_keys['jump']:
+                            p1.dino.jump_release()
+                        if p2_keys['jump']:
+                            p2.dino.jump_release()
+                        if p1_keys['duck']:
+                            p1.dino.duck(False)
+                        if p2_keys['duck']:
+                            p2.dino.duck(False)
+
                         p1.reset()
                         p2.reset()
                         p1_keys = {'jump': False, 'duck': False}
@@ -995,6 +995,32 @@ class GameManager:
                         match_result = None
                     if event.key == pygame.K_ESCAPE:
                         running = False
+                    # P1: T = Sword | P2: K_1 = Sword
+                    if event.key == pygame.K_t:
+                        if not p1.game_over: p1.sword_slash()
+                    if event.key == pygame.K_l:
+                        if not p2.game_over: p2.sword_slash()
+
+                if event.type == pygame.KEYUP:
+                    # P1: nhả W/S
+                    if event.key == pygame.K_w:
+                        if p1_keys['jump']:
+                            p1.dino.jump_release()
+                            p1_keys['jump'] = False
+                    if event.key == pygame.K_s:
+                        if p1_keys['duck']:
+                            p1.dino.duck(False)
+                            p1_keys['duck'] = False
+
+                    # P2: nhả Up/Down
+                    if event.key == pygame.K_UP:
+                        if p2_keys['jump']:
+                            p2.dino.jump_release()
+                            p2_keys['jump'] = False
+                    if event.key == pygame.K_DOWN:
+                        if p2_keys['duck']:
+                            p2.dino.duck(False)
+                            p2_keys['duck'] = False
 
             # --- BƯỚC 2: CẬP NHẬT TÁCH BIỆT "VŨ TRỤ" ---
 

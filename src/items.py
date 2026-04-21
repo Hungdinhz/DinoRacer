@@ -2,7 +2,7 @@
 import pygame
 import random
 from src.assets_loader import (
-    get_sprite, get_cached_font_item, get_item_sprite
+    get_sheet, get_sprite, get_cached_font_item, get_item_sprite
 )
 from config.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, GROUND_Y,
@@ -41,19 +41,35 @@ class Coin(Item):
         self.height = COIN_HEIGHT
         self.bonus_points = 5
         self._font = get_cached_font_item('Arial', 20, bold=True)
-        self._sprite = get_sprite("coin", (self.width, self.height))
+        
+        # --- THIẾT LẬP ANIMATION ---
+        self.current_frame = 0
+        self.animation_speed = 0.15
+        
+        # Dùng hàm get_sheet đã có sẵn trong assets_loader.py
+        # Truyền đường dẫn tương đối 'items/Coin.png', số frame = 4
+        self.frames = get_sheet('items/Coin.png', 4, self.width, self.height)
+
+    def update(self):
+        super().update()
+        
+        # Cập nhật animation nếu đã tải frames thành công
+        if self.frames:
+            self.current_frame += self.animation_speed
+            if self.current_frame >= len(self.frames):
+                self.current_frame = 0
 
     def draw(self, screen):
-        sprite = self._sprite
-        if sprite:
-            screen.blit(sprite, (self.x, self.y))
+        if self.frames:
+            # Ép kiểu current_frame về số nguyên (0, 1, 2, 3)
+            image_to_draw = self.frames[int(self.current_frame)]
+            screen.blit(image_to_draw, (self.x, self.y))
         else:
-            # Fallback: chỉ vẽ khi sprite thật sự không có
-            center = (self.x + self.width // 2, self.y + self.height // 2)
+            # Fallback nếu đường dẫn ảnh vẫn sai
+            center = (int(self.x + self.width // 2), int(self.y + self.height // 2))
             pygame.draw.circle(screen, (255, 215, 0), center, self.width // 2)
             text = self._font.render("$", True, (184, 134, 11))
             screen.blit(text, text.get_rect(center=center))
-
 
 class Shield(Item):
     def __init__(self, x, speed):
