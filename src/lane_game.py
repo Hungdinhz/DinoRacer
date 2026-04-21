@@ -53,7 +53,7 @@ def _get_bg(idx):
 
 def _get_tile(size):
     if size not in _tile_cache:
-        _tile_cache[size] = load_image("tiles/Tile_01.png", size)
+        _tile_cache[size] = load_image("tiles/Tile_02.png", size)
     return _tile_cache[size]
 
 
@@ -387,7 +387,7 @@ class LaneGame:
         self._spawn_obstacle()
 
         self.ground_offset = (self.ground_offset + self.game_speed * current_speed_multiplier) % 64
-        self.bg_offset = (self.bg_offset + self.game_speed * 0.15 * current_speed_multiplier) % LANE_W
+        self.bg_offset = (self.bg_offset + self.game_speed * 0.03 * current_speed_multiplier) % LANE_W
 
         prev = self.score
         for obs in self.obstacles:
@@ -518,6 +518,11 @@ class LaneGame:
         if ox > 0:
             surf.blit(bg, (LANE_W - ox, 0))
 
+        fog = pygame.Surface((LANE_W, LANE_H), pygame.SRCALPHA)
+        # Số 90 cuối cùng là độ mờ (0-255). Càng cao thì BG càng bị che mờ!
+        fog.fill((200, 220, 240, 90)) 
+        surf.blit(fog, (0, 0))
+        
         for c in self.clouds:
             c.draw(surf)
 
@@ -564,6 +569,16 @@ class LaneGame:
             data_icon = self.font_small.render("●", True, (0, 255, 0))
             surf.blit(data_icon, (LANE_W - 25, 28))
 
+        if self.game_over:
+            # Tạo bề mặt phủ đen
+            dark_overlay = pygame.Surface((LANE_W, LANE_H), pygame.SRCALPHA)
+            
+            # Đặt độ tối CỐ ĐỊNH ở mức 150 (không dùng go_flash_timer nữa)
+            # Bạn có thể tăng lên 180 hoặc 200 nếu muốn tối đen hơn
+            dark_overlay.fill((0, 0, 0, 150))
+            
+            surf.blit(dark_overlay, (0, 0))
+        
         if self.game_over and show_go:
             fade_progress = min(1.0, self.go_flash_timer / 20)
 

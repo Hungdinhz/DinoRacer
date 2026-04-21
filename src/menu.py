@@ -238,7 +238,7 @@ class Menu:
             {"img": "items/Shield.png", "name": "Khiên (Shield)", "desc": "Bảo vệ bạn khỏi 1 lần va chạm."},
             {"img": "items/Speed.png", "name": "Tốc độ (Speed)", "desc": "Phóng nhanh, tăng tốc trong 5s."},
             {"img": "items/x2coin.png", "name": "Nhân đôi (X2)", "desc": "Nhân đôi điểm số nhận được trong 10s."},
-            {"img": "items/Sword.png", "name": "Kiếm (Sword)", "desc": "Cho phép chém chướng ngại vật phía trước."}
+            {"img": "items/Sword.png", "name": "Kiếm (Sword)", "desc": "Nhấn T để chém chướng ngại vật phía trước."}
         ]
 
         from src.assets_loader import load_image
