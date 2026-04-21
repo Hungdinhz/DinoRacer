@@ -143,6 +143,7 @@ class LaneGame:
         self.next_spawn_items_score = 0
         self.speed_buff_timer = 0
         self.x2_buff_timer = 0
+        self.shield_buff_timer = 0
         self.game_over = False
         self.ground_offset = 0
 
@@ -229,13 +230,25 @@ class LaneGame:
         margin = COLLISION_MARGIN
         shrunk = dino_rect.inflate(-margin * 2, -margin * 2)
         for obs in self.obstacles:
-            if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):
-                if self.dino.has_shield:
-                    self.dino.has_shield = False
-                    self.obstacles.remove(obs)
-                    play_sound("shield_broken")
-                    return False
-                return True
+            obs_rect = obs.get_rect()
+            if shrunk.colliderect(obs_rect.inflate(-margin, -margin)):
+                dino_mask, dx, dy = self.dino.get_mask_info()
+                obs_mask, ox, oy = obs.get_mask_info()
+                
+                is_collide = True
+                if dino_mask and obs_mask:
+                    offset = (int(ox - dx), int(oy - dy))
+                    if not dino_mask.overlap(obs_mask, offset):
+                        is_collide = False
+                
+                if is_collide:
+                    if self.dino.has_shield:
+                        self.dino.has_shield = False
+                        self.shield_buff_timer = 0
+                        self.obstacles.remove(obs)
+                        play_sound("shield_broken")
+                        return False
+                    return True
         return False
 
     def sword_slash(self):
@@ -383,6 +396,10 @@ class LaneGame:
             self.speed_buff_timer -= 1
         if self.x2_buff_timer > 0:
             self.x2_buff_timer -= 1
+        if getattr(self, 'shield_buff_timer', 0) > 0:
+            self.shield_buff_timer -= 1
+            if self.shield_buff_timer == 0:
+                self.dino.has_shield = False
 
         current_speed_multiplier = 1.1 if self.speed_buff_timer > 0 else 1.0
 
@@ -445,6 +462,8 @@ class LaneGame:
                 
                 if isinstance(item, Shield):
                     self.dino.has_shield = True
+                    from config.settings import MAX_SHIELD_TIME
+                    self.shield_buff_timer = MAX_SHIELD_TIME
                     self.add_notification("SHIELD!", (0, 191, 255))
                 elif isinstance(item, SpeedItem):
                     self.speed_buff_timer = MAX_SPEED_TIME
@@ -555,12 +574,12 @@ class LaneGame:
 
         self.draw_notifications(surf)
 
-        # Buff HUD ở góc trái (thời gian tồn tại buff)
+        from config.settings import MAX_SHIELD_TIME
         self.ui.draw_buffs(
             self.speed_buff_timer, MAX_SPEED_TIME,
             self.x2_buff_timer, MAX_X2_TIME,
+            getattr(self, 'shield_buff_timer', 0), MAX_SHIELD_TIME,
             self.dino.sword_charges,
-            self.dino.has_shield,
             self.sword_key,
         )
 

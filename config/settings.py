@@ -74,6 +74,7 @@ X2COIN_HEIGHT = 100
 # BuffsItem
 MAX_SPEED_TIME = 300 # 5 giây
 MAX_X2_TIME = 600    # 10 giây
+MAX_SHIELD_TIME = 2400 # 20 giây
 PLUS_COUNT_SWORD = 1 # Cho phép chém thêm 1 lần khi nhặt được item kiếm
 
 # Tốc độ chướng ngại vật - Điều chỉnh cho màn hình lớn hơn

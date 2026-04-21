@@ -36,6 +36,9 @@ class Obstacle:
     def get_rect(self):
         raise NotImplementedError
 
+    def get_mask_info(self):
+        return None, self.x, self.y
+
     def is_off_screen(self):
         return self.x < -100
 # ==========================================
@@ -109,6 +112,12 @@ class Cactus(Obstacle):
         # Ví dụ gọt viền: rect = rect.inflate(-10, -10)
         return rect
 
+    def get_mask_info(self):
+        sprite = _get_obstacle_sprite(self.image_path, self.width, self.height)
+        if sprite:
+            return pygame.mask.from_surface(sprite), self.x, self.y
+        return None, self.x, self.y
+
     def draw(self, screen):
         rect = self.get_rect()
         
@@ -167,6 +176,12 @@ class Bird(Obstacle):
         trimmed_rect = collide_rect.inflate(-60, -50)
         
         return trimmed_rect
+
+    def get_mask_info(self):
+        frames = _get_bird_frames(self.width, self.height)
+        if frames and self.anim_frame < len(frames):
+            return pygame.mask.from_surface(frames[self.anim_frame]), self.x, self.y
+        return None, self.x, self.y
 
     def draw(self, screen):
         rect = self.get_rect()

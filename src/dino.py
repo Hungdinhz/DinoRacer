@@ -272,6 +272,28 @@ class Dino:
         self._cached_rect = rect
         return self._cached_rect
 
+    def get_mask_info(self):
+        anim = self._anim_name()
+        num_frames = _ANIM_FRAMES.get(anim, 1)
+        frames = get_sheet(
+            f"{self.folder}/{anim}.png",
+            num_frames,
+            self.width,
+            self.height
+        )
+        if frames:
+            idx = min(self.anim_frame, len(frames) - 1)
+            frame = frames[idx]
+            if abs(self._scale_x - 1.0) > 0.03 or abs(self._scale_y - 1.0) > 0.03:
+                new_w = int(self.width * self._scale_x)
+                new_h = int(self.height * self._scale_y)
+                scaled = pygame.transform.scale(frame, (new_w, new_h))
+                offset_x = (self.width - new_w) // 2
+                offset_y = (self.height - new_h) - ((self.height - new_h) // 2)
+                return pygame.mask.from_surface(scaled), self.x + offset_x, self.y + offset_y
+            return pygame.mask.from_surface(frame), self.x, self.y
+        return None, self.x, self.y
+
     def draw(self, screen):
         # Tạo một khung vẽ ảnh nguyên vẹn từ tọa độ x, y gốc (ảnh sẽ đứng im)
         h = self.height

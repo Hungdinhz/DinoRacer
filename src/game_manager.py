@@ -227,6 +227,7 @@ class GameManager:
         # Bien đếm thời gian buff item
         self.speed_buff_timer = 0  # Đếm ngược thời gian chạy nhanh
         self.x2_buff_timer = 0     # Đếm ngược thời gian x2 vàng
+        self.shield_buff_timer = 0 # Đếm ngược thời gian khiên
 
         self.reset()
 
@@ -247,9 +248,11 @@ class GameManager:
         self._dust_spawn_timer = 0
         self.go_flash_timer = 0
         self.bg_index = 1
+        self.ui.bg_index = 1
         self.next_spawn_items_score = 0
         self.speed_buff_timer = 0  # Đếm ngược thời gian chạy nhanh
         self.x2_buff_timer = 0
+        self.shield_buff_timer = 0
 
         # Achievement popup state
         self.pending_achievements = []
@@ -304,18 +307,31 @@ class GameManager:
             # Bỏ qua obstacle ở xa
             if obs.x > dino_x + 100:
                 continue
-            if shrunk.colliderect(obs.get_rect().inflate(-margin, -margin)):
-                if self.dino.has_shield:
-                    # Nếu có khiên: Làm vỡ khiên và tha mạng!
-                    self.dino.has_shield = False
-                    
-                    # QUAN TRỌNG: Bạn phải xóa luôn chướng ngại vật đó đi 
-                    # Nếu không frame tiếp theo (1/60 giây sau) nó lại cạ vào Dino báo Game over đấy
-                    self.obstacles.remove(obs) 
-                    play_sound("shield_broken")
-                else:
-                    # Không có khiên -> Chết như bình thường
-                    self.game_over = True
+                
+            obs_rect = obs.get_rect()
+            if shrunk.colliderect(obs_rect.inflate(-margin, -margin)):
+                # Lấy mask pixel-perfect
+                dino_mask, dx, dy = self.dino.get_mask_info()
+                obs_mask, ox, oy = obs.get_mask_info()
+                
+                is_collide = True
+                if dino_mask and obs_mask:
+                    offset = (int(ox - dx), int(oy - dy))
+                    if not dino_mask.overlap(obs_mask, offset):
+                        is_collide = False
+                
+                if is_collide:
+                    if self.dino.has_shield:
+                        # Nếu có khiên: Làm vỡ khiên và tha mạng!
+                        self.dino.has_shield = False
+                        self.shield_buff_timer = 0
+                        
+                        # QUAN TRỌNG: Bạn phải xóa luôn chướng ngại vật đó đi 
+                        self.obstacles.remove(obs) 
+                        play_sound("shield_broken")
+                    else:
+                        # Không có khiên -> Chết như bình thường
+                        self.game_over = True
         return False
 
     def sword_slash(self):
@@ -396,6 +412,10 @@ class GameManager:
             self.speed_buff_timer -= 1
         if self.x2_buff_timer > 0:
             self.x2_buff_timer -= 1
+        if getattr(self, 'shield_buff_timer', 0) > 0:
+            self.shield_buff_timer -= 1
+            if self.shield_buff_timer == 0:
+                self.dino.has_shield = False
 
         # Tính tốc độ chạy của ván game hiện tại
         # Nếu đang có buff tốc độ, cho mọi thứ trôi nhanh gấp rưỡi (1.1)
@@ -451,8 +471,6 @@ class GameManager:
             if obs.x < self.dino.x and not obs.passed:
                 obs.passed = True
                 self.score += 1
-            if self.score >= 2000 and not self.is_ai_mode:
-                    self.game_over = True
         if self.score // 100 > prev_score // 100 and self.score > 0:
             play_sound("score")
 
@@ -462,7 +480,8 @@ class GameManager:
 
         self.game_speed = OBSTACLE_SPEED_MIN + (self.score // SPEED_INCREASE_INTERVAL) * SPEED_INCREASE_AMOUNT
         self.game_speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
-        self.bg_index = min(1 + self.score // 50, 5)
+        self.bg_index = min(1 + self.score // 200, 5)
+        self.ui.bg_index = self.bg_index
 
         # 1. Sinh ra Coin ngẫu nhiên nếu đủ điều kiện
         start_coin_x = SCREEN_WIDTH + 50
@@ -504,6 +523,8 @@ class GameManager:
                 
                 if isinstance(item, Shield):
                     self.dino.has_shield = True
+                    from config.settings import MAX_SHIELD_TIME
+                    self.shield_buff_timer = MAX_SHIELD_TIME
                     
                 elif isinstance(item, SpeedItem):
                     self.speed_buff_timer = MAX_SPEED_TIME # Ví dụ game chạy 60 FPS -> 300 frame = 5 giây
@@ -549,7 +570,7 @@ class GameManager:
         for c in self.clouds:
             c.update()
             
-        if self.score >= 1000 and not self.is_ai_mode:
+        if self.score >= 1500 and not self.is_ai_mode:
             self.game_won = True
             # play_sound("win") # Bỏ comment nếu bạn có file âm thanh win
             return
@@ -628,18 +649,20 @@ class GameManager:
 
         score_txt = self.font_hud.render(f"SCORE  {self.score:05d}", True, (255, 230, 80))
         hi_txt    = self.font_hud.render(f"HI  {h:05d}", True, (200, 200, 200))
-        spd_txt   = self.font_speed.render(f"SPD  {self.game_speed:.1f}", True, (150, 230, 150))
+        
+        prog_percent = min(100, int((self.score / 1500) * 100))
+        prog_txt  = self.font_speed.render(f"DEST {prog_percent}%", True, (0, 200, 255))
+        
         self.screen.blit(score_txt, (self._half_screen - 118, 12))
         self.screen.blit(hi_txt,    (self._half_screen - 118, 38))
-        self.screen.blit(spd_txt,   (self._half_screen + 30,  38))
+        self.screen.blit(prog_txt,  (self._half_screen + 30,  38))
 
-        # Speed bar
+        # Progress bar
         bar_x, bar_y, bar_w, bar_h = self._half_screen + 30, 14, 90, 10
-        ratio = (self.game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
+        ratio = min(1.0, self.score / 1500)
         pygame.draw.rect(self.screen, (50, 50, 50), (bar_x, bar_y, bar_w, bar_h), border_radius=4)
         fill_w = max(1, int(bar_w * ratio))
-        bar_color = (int(80 + 175 * ratio), int(200 - 150 * ratio), 50)
-        pygame.draw.rect(self.screen, bar_color,
+        pygame.draw.rect(self.screen, (0, 200, 255),
                          (bar_x, bar_y, fill_w, bar_h), border_radius=4)
     
     def _draw_achievement_popup(self):
@@ -705,8 +728,8 @@ class GameManager:
         self.ui.draw_buffs(
             self.speed_buff_timer, MAX_SPEED_TIME, 
             self.x2_buff_timer, MAX_X2_TIME, 
+            getattr(self, 'shield_buff_timer', 0), getattr(game_settings, 'MAX_SHIELD_TIME', 2400),
             self.dino.sword_charges,
-            self.dino.has_shield,
             "T"
         )
 
@@ -755,9 +778,9 @@ class GameManager:
                     if event.key == pygame.K_t:
                         if not self.game_over and not self.paused:
                             self.sword_slash()
-                    if event.key == pygame.K_r and self.game_over:
+                    if event.key == pygame.K_r and (self.game_over or getattr(self, 'game_won', False)):
                         self.reset()
-                    if event.key == pygame.K_ESCAPE and self.game_over:
+                    if event.key == pygame.K_ESCAPE and (self.game_over or getattr(self, 'game_won', False)):
                         running = False
 
                 if event.type == pygame.KEYUP:
