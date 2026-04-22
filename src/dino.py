@@ -72,6 +72,7 @@ class Dino:
         self._jump_buffer_timer: int = 0   # Đếm thời gian trước khi chạm ground
         self._was_jumping: bool = False     # Track trạng thái jumping trước đó
         self._jump_held: bool = False       # Track xem phím jump có đang được giữ
+        self._pending_duck: bool = False    # Lưu lệnh cúi khi đang nhảy (AI)
 
         # Squash & stretch
         self._scale_x = 1.0
@@ -143,10 +144,15 @@ class Dino:
                 self._cached_rect = None  # Invalidate cache khi thay đổi trạng thái
 
     def set_duck(self, should_duck: bool):
-        """Đặt trạng thái cúi - AI dùng hàm này thay vì duck()"""
+        """Đặt trạng thái cúi - AI dùng hàm này thay vì duck()
+        Nếu đang nhảy, lưu lệnh cúi và áp dụng ngay khi hạ cánh.
+        """
         if not self.is_jumping:
             self.is_ducking = should_duck
             self._cached_rect = None  # Invalidate cache
+        else:
+            # Lưu lệnh cúi để áp dụng khi hạ cánh
+            self._pending_duck = should_duck
 
     def _update_scale(self):
         """Cập nhật squash & stretch"""
@@ -193,6 +199,12 @@ class Dino:
                 self.is_jumping = False
                 self.is_on_ground = True
                 self._coyote_timer = COYOTE_TIME  # Reset coyote time sau khi land
+                
+                # Áp dụng pending duck khi hạ cánh (AI gửi lệnh cúi khi đang nhảy)
+                if self._pending_duck:
+                    self.is_ducking = True
+                    self._cached_rect = None
+                    self._pending_duck = False
         else:
             # Trên ground - đảm bảo y đúng vị trí
             self.is_on_ground = True

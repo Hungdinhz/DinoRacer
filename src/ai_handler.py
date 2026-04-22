@@ -74,11 +74,17 @@ def load_genome():
 
 def _get_inputs_from_lane(lane):
     """Lấy inputs từ LaneGame object (dùng cho PVE mode)."""
-    return _get_inputs(lane.dino, lane.obstacles, lane.game_speed)
+    from src.lane_game import LOGIC_Y
+    return _get_inputs(lane.dino, lane.obstacles, lane.game_speed, ground_y=LOGIC_Y)
 
 
-def _get_inputs(dino, obstacles, game_speed):
-    """Cải thiện inputs cho AI - thêm nhiều features hơn"""
+def _get_inputs(dino, obstacles, game_speed, ground_y=None):
+    """Cải thiện inputs cho AI - thêm nhiều features hơn
+    ground_y: tọa độ mặt đất thực tế (dùng LOGIC_Y cho lane mode, GROUND_Y cho mode thường)
+    """
+    if ground_y is None:
+        ground_y = GROUND_Y
+
     nearest = None
     second_nearest = None
     min_dist = float('inf')
@@ -109,10 +115,13 @@ def _get_inputs(dino, obstacles, game_speed):
     # 2. Loại obstacle gần nhất (0 = Cactus, 1 = Bird)
     type1 = 0.0 if isinstance(nearest, Cactus) else 1.0
 
-    # 3. Chiều cao của Bird (0 = thấp, 1 = cao, 2 = rất cao)
+    # 3. Chiều cao của Bird - dùng ground_y thực tế thay vì GROUND_Y cố định
     if isinstance(nearest, Bird):
         bird_height = nearest.y
-        height_ratio = (GROUND_Y - bird_height) / 130  # 130 = max height diff
+        # Khoảng cách từ mặt đất đến chim
+        bird_dist_from_ground = ground_y - bird_height
+        # Normalize: 130 = max height diff (tương đương chim bay cao nhất)
+        height_ratio = max(0, min(bird_dist_from_ground / 130, 1.0))
         type1 = 0.3 + height_ratio * 0.7  # Map to 0.3-1.0 range
 
     # 4. Khoảng cách đến obstacle thứ 2
@@ -121,8 +130,8 @@ def _get_inputs(dino, obstacles, game_speed):
     # 5. Tốc độ game (normalized)
     speed_norm = (game_speed - OBSTACLE_SPEED_MIN) / (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
 
-    # 6. Độ cao hiện tại của dino (0 = ground, 1 = cao nhất)
-    height_norm = min((GROUND_Y - dino.y) / 100, 1.0)
+    # 6. Độ cao hiện tại của dino (0 = ground, 1 = cao nhất) - dùng ground_y thực tế
+    height_norm = min((ground_y - dino.y) / 100, 1.0)
 
     # 7. Đang nhảy hay không
     is_jumping = 1.0 if dino.is_jumping else 0.0
@@ -310,8 +319,23 @@ class HybridAI:
             neat_jump = neat_output[0]
             neat_duck = neat_output[1] if len(neat_output) > 1 else 0
 
-        # Nếu không có supervised, chỉ dùng NEAT
+        dist1 = inputs[0]   # khoảng cách đến obstacle gần nhất (normalized)
+        type1 = inputs[1]   # loại obstacle (0 = Cactus, 0.3-1.0 = Bird)
+        is_jumping = inputs[5]
+        is_ducking = inputs[6]
+
+        # Phát hiện chim: type1 >= 0.3 là chim
+        is_bird = type1 >= 0.3
+
+        # Nếu không có supervised, dùng NEAT + rule-based cho chim
         if not self.supervised_jump_model:
+            if is_bird:
+                # Chim đang tới: KHÔNG nhảy (tránh nhảy lên rồi rơi trúng chim)
+                if dist1 < 0.8:
+                    neat_jump = 0
+                # Chim gần + đang ở mặt đất: CÚI
+                if dist1 < 0.5 and is_jumping < 0.5:
+                    return (0, 1)
             return (1 if neat_jump > 0.5 else 0, 1 if neat_duck > 0.5 else 0)
 
         # Supervised prediction - chỉ dùng 6 features đầu (bỏ dist2 và bias)
@@ -325,22 +349,39 @@ class HybridAI:
             sup_jump_prob = self.supervised_jump_model.predict_proba(inputs_scaled)[0][1]
             sup_duck_prob = self.supervised_duck_model.predict_proba(inputs_scaled)[0][1]
 
-            # Rule-based combination: NEAT with safety override
-            dist1 = inputs[0]  # normalized distance to nearest obstacle
+            # Rule-based cho chim: tất cả chim đều cần cúi
+            if is_bird:
+                # Chim đang tới: KHÔNG nhảy
+                if dist1 < 0.8:
+                    neat_jump = 0
+                    sup_jump_prob = 0
+                # Chim gần + đang ở mặt đất: CÚI
+                if dist1 < 0.5 and is_jumping < 0.5:
+                    return (0, 1)
 
-            # If obstacle is close (< 25% of screen), FORCE JUMP
-            if dist1 < 0.25:
+            # Khoảng cách gần + là cactus => nhảy
+            if dist1 < 0.25 and not is_bird:
                 return (1, 0)
 
-            # Otherwise use NEAT output directly
-            final_jump = 1 if neat_jump > 0.3 else 0
-            final_duck = 0  # Disable duck for safety
+            # Kết hợp NEAT + Supervised
+            w = self.neat_weight
+            combined_jump = w * neat_jump + (1 - w) * sup_jump_prob
+            combined_duck = w * neat_duck + (1 - w) * sup_duck_prob
+
+            final_jump = 1 if combined_jump > 0.5 else 0
+            final_duck = 1 if combined_duck > 0.5 else 0
+
+            # Không nhảy và cúi cùng lúc
+            if final_jump and final_duck:
+                final_duck = 0
 
             return (final_jump, final_duck)
 
         except Exception as e:
-            # Nếu supervised lỗi, fallback về NEAT
+            # Nếu supervised lỗi, fallback về NEAT + rule-based
             print(f"Hybrid AI warning: {e}")
+            if is_bird and dist1 < 0.5 and is_jumping < 0.5:
+                return (0, 1)
             return (1 if neat_jump > 0.5 else 0, 1 if neat_duck > 0.5 else 0)
 
 

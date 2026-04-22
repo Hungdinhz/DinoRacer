@@ -937,27 +937,95 @@ class GameManager:
                     if event.key == pygame.K_DOWN: player_lane.dino.duck(False)
 
             if not ai_lane.game_over:
+                # ===== HELPER: Rule-based obstacle dodge override =====
+                def _apply_obstacle_dodge(action_list, lane):
+                    """Scan tất cả obstacles và override AI action khi cần.
+                    
+                    Xử lý:
+                    - CHIM: Detect chim trên đầu, cúi khi gần, không nhảy vào chim
+                    - CACTUS: Safety net — nhảy khi cactus quá gần mà AI chưa phản ứng
+                    """
+                    from src.obstacle import Bird
+                    dino_x = lane.dino.x
+                    dino_right = dino_x + lane.dino.width
+
+                    nearest_bird_dist = float('inf')
+                    nearest_cactus_dist = float('inf')
+                    bird_overhead = False
+
+                    for obs in lane.obstacles:
+                        if isinstance(obs, Bird):
+                            bird_right = obs.x + obs.width
+                            if bird_right > dino_x:
+                                dist = max(0, obs.x - dino_x)
+                                nearest_bird_dist = min(nearest_bird_dist, dist)
+                                if obs.x < dino_right:
+                                    bird_overhead = True
+                        else:
+                            if obs.x > dino_x:
+                                dist = obs.x - dino_x
+                                nearest_cactus_dist = min(nearest_cactus_dist, dist)
+
+                    has_bird_near = nearest_bird_dist < 400
+
+                    # === BIRD LOGIC ===
+                    if bird_overhead:
+                        # Chim TRÊN ĐẦU → buộc cúi
+                        action_list[0] = 0
+                        if len(action_list) > 1:
+                            action_list[1] = 1
+                        else:
+                            action_list.append(1)
+                    elif has_bird_near:
+                        if nearest_cactus_dist < nearest_bird_dist and nearest_cactus_dist < 150:
+                            # Cactus gần hơn chim → nhảy qua cactus
+                            action_list[0] = 1
+                            if len(action_list) > 1:
+                                action_list[1] = 0
+                        else:
+                            # Chim đang tới → KHÔNG nhảy
+                            action_list[0] = 0
+                            if nearest_bird_dist < 350:
+                                if len(action_list) > 1:
+                                    action_list[1] = 1
+                                else:
+                                    action_list.append(1)
+                    else:
+                        # === CACTUS SAFETY NET ===
+                        # Nếu cactus gần mà AI chưa nhảy → buộc nhảy
+                        if nearest_cactus_dist < 200 and not lane.dino.is_jumping and not lane.dino.is_ducking:
+                            action_list[0] = 1
+                            if len(action_list) > 1:
+                                action_list[1] = 0
+
+                    return action_list
+                # ===== END HELPER =====
+
                 if ai_type == 'neat' and net:
+                    inputs = _get_inputs_from_lane(ai_lane)
+                    neat_output = list(net.activate(inputs))
+                    neat_output = _apply_obstacle_dodge(neat_output, ai_lane)
+
                     ai_state = self._update_lane_with_random_state(
-                        ai_lane,
-                        ai_state,
-                        action=net.activate(_get_inputs_from_lane(ai_lane))
+                        ai_lane, ai_state, action=neat_output
                     )
                 elif ai_type == 'supervised' and jump_model and duck_model:
-                    # Get inputs for supervised model
                     from src.ai_handler import _get_inputs
-                    inputs = _get_inputs(ai_lane.dino, ai_lane.obstacles, ai_lane.game_speed)
-                    action = predict_action(jump_model, jump_scaler, duck_model, duck_scaler, inputs)
+                    from src.lane_game import LOGIC_Y
+                    inputs = _get_inputs(ai_lane.dino, ai_lane.obstacles, ai_lane.game_speed, ground_y=LOGIC_Y)
+                    action = list(predict_action(jump_model, jump_scaler, duck_model, duck_scaler, inputs))
+                    action = _apply_obstacle_dodge(action, ai_lane)
+
                     ai_state = self._update_lane_with_random_state(
-                        ai_lane,
-                        ai_state,
-                        action=action[:2]
-                    )  # Take first 2 values (jump, duck)
+                        ai_lane, ai_state, action=action[:2]
+                    )
                 elif ai_type == 'hybrid' and hybrid_ai:
-                    # Hybrid AI prediction
                     from src.ai_handler import _get_inputs
-                    inputs = _get_inputs(ai_lane.dino, ai_lane.obstacles, ai_lane.game_speed)
-                    action = hybrid_ai.predict(inputs)
+                    from src.lane_game import LOGIC_Y
+                    inputs = _get_inputs(ai_lane.dino, ai_lane.obstacles, ai_lane.game_speed, ground_y=LOGIC_Y)
+                    action = list(hybrid_ai.predict(inputs))
+                    action = _apply_obstacle_dodge(action, ai_lane)
+
                     ai_state = self._update_lane_with_random_state(ai_lane, ai_state, action=action)
                 else:
                     ai_state = self._update_lane_with_random_state(ai_lane, ai_state)

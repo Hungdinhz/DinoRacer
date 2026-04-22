@@ -215,10 +215,11 @@ class LaneGame:
                 obs.y = LOGIC_Y - obs.height
                 
             elif isinstance(obs, Bird):
-                # CÁCH A: Trả chim về lại đúng độ cao cũ (Dùng GROUND_Y_LANE)
+                # Fix: Tính offset từ mặt đất gốc, rồi áp dụng offset đó cho mặt đất lane
+                # Ví dụ: chim ở GROUND_Y-150 → offset=150 → lane: LOGIC_Y-150
                 from config.settings import GROUND_Y
-                ratio = GROUND_Y_LANE / GROUND_Y 
-                obs.y = int(obs.y * ratio)
+                bird_offset = GROUND_Y - obs.y  # Khoảng cách từ mặt đất đến chim (150 hoặc 110)
+                obs.y = LOGIC_Y - bird_offset
             self.obstacles.append(obs)
             self.last_obstacle_x = obs.x
             self.next_spawn_distance = random.randint(500, 1000)
