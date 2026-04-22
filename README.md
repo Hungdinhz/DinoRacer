@@ -1,18 +1,27 @@
-# DinoRacer
+# DinoRacer Ultimate
 
-Game khủng long nhảy (giống Chrome Dino) với AI học bằng thuật toán NEAT.
-
----
-
-## Mô tả
-
-- **Chế độ Human**: Chơi thủ công (Space nhảy, ↓ cúi)
-- **Chế độ AI**: Huấn luyện neural network bằng NEAT
-- **Chế độ AI-play**: Chạy AI đã lưu, không cần train lại
+Game khủng long nhảy (giống Chrome Dino) được nâng cấp với nhiều chế độ chơi, hỗ trợ chơi 2 người, tích hợp hệ thống vật phẩm (items) và trí tuệ nhân tạo (AI) sử dụng các thuật toán như NEAT và Supervised Learning.
 
 ---
 
-## Cài đặt
+## 🎮 Các chế độ chơi (Game Modes)
+
+- **Classic**: Chơi đơn truyền thống.
+- **Time Attack**: Đua với thời gian.
+- **Endless**: Chế độ chơi vô tận.
+- **PVE (VS AI)**: Thi đấu với các đối thủ AI (bao gồm NEAT AI, Supervised AI, và Hybrid AI).
+- **PVP (VS PLAYER)**: Thi đấu 2 người chơi trên cùng một máy.
+
+## 🤖 Tính năng AI
+
+- **NEAT Training**: Huấn luyện AI qua giao diện trực quan hoặc chế độ chạy ngầm bằng thuật toán tiến hóa NEAT.
+- **Supervised Training**: Huấn luyện AI bằng phương pháp học có giám sát dựa trên dữ liệu (records) thu thập được từ thao tác của người chơi.
+
+---
+
+## ⚙️ Cài đặt
+
+Yêu cầu đã cài đặt Python 3. Sau đó, chạy lệnh sau để cài đặt các thư viện phụ thuộc:
 
 ```bash
 pip install -r requirements.txt
@@ -20,45 +29,48 @@ pip install -r requirements.txt
 
 ---
 
-## Chạy game
+## 🚀 Chạy game
+
+Khởi chạy game để mở Menu chính và lựa chọn các chế độ chơi:
 
 ```bash
-python main.py human    # Chơi thủ công
-python main.py ai       # Train AI (lưu vào best_genome.pkl)
-python main.py ai-play  # Chạy AI đã lưu
+python main.py
 ```
 
-**Điều khiển:** Space = nhảy, ↓ = cúi, R = Restart (khi game over)
+### Bảng điều khiển cơ bản:
+- **Người chơi 1 / Chơi đơn**:
+  - `Space` hoặc `↑` : Nhảy
+  - `↓` hoặc `S`     : Cúi (giữ phím)
+  - `T`              : Chém kiếm (khi nhặt được vật phẩm kiếm)
+  - `P`              : Tạm dừng (Pause)
+  - `R`              : Chơi lại (Restart)
+  - `ESC`            : Trở về màn hình chính hoặc Thoát
+  - `F11`            : Bật/tắt chế độ toàn màn hình (Fullscreen)
+- *(Trong chế độ PVP, người chơi 2 sẽ sử dụng các phím như W/S/Q/D hoặc theo cấu hình ingame).*
 
 ---
 
-## Cấu trúc dự án
+## 📂 Cấu trúc dự án
 
 ```
 DinoRacer/
-├── main.py           # Điểm vào
-├── config/           # Cấu hình (settings, NEAT)
-├── src/              # Code game
-├── assets/           # Ảnh, âm thanh
-└── docs/             # Tài liệu
-    ├── TEAM_REVIEW.md   # Review cho team
-    └── ASSETS.md       # Hướng dẫn sprites & âm thanh
+├── main.py                   # Điểm vào (khởi chạy trò chơi và menu chính)
+├── server.py                 # Backend Server (Leaderboard, quản lý game sessions)
+├── config/                   # Các file cấu hình cài đặt hệ thống và NEAT
+├── src/                      # Source code chính (game logic, UI, AI, database,...)
+├── assets/                   # Hình ảnh (sprites), âm thanh (sounds) và fonts chữ
+├── database_schema.sql       # Script khởi tạo cấu trúc cơ sở dữ liệu
+├── requirements.txt          # Danh sách các thư viện cần cài đặt
+├── best_genome.pkl           # Mô hình AI của thuật toán NEAT tốt nhất
+└── duck_model.pkl / jump_model.pkl # Mô hình AI sử dụng Supervised Learning
 ```
 
 ---
 
-## Tài liệu
+## 🛠️ Công nghệ sử dụng
 
-| File | Nội dung |
-|------|----------|
-| [docs/HUONG_DAN_CONG_VIEC.md](docs/HUONG_DAN_CONG_VIEC.md) | **Hướng dẫn chi tiết** cho từng thành viên team |
-| [docs/TEAM_REVIEW.md](docs/TEAM_REVIEW.md) | Cấu trúc code, chi tiết module, trạng thái dự án |
-| [docs/ASSETS.md](docs/ASSETS.md) | Hướng dẫn thêm sprites và âm thanh |
-
----
-
-## Công nghệ
-
-- Python 3
-- Pygame
-- NEAT (neat-python)
+- **Python 3**
+- **Pygame**: Render đồ họa 2D và âm thanh
+- **NEAT (neat-python)**: Thuật toán di truyền phát triển mạng Neural Network
+- **Scikit-learn**: Thuật toán Machine Learning (Supervised Learning)
+- **SQLite / PostgreSQL**: Hệ quản trị cơ sở dữ liệu lưu thông tin highscore và sessions
