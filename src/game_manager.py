@@ -722,12 +722,13 @@ class GameManager:
         for item in self.items:
             item.draw(self.screen)
 
+        sword_key_str = "" if getattr(self, 'is_ai_mode', False) else "T"
         self.ui.draw_buffs(
             self.speed_buff_timer, MAX_SPEED_TIME, 
             self.x2_buff_timer, MAX_X2_TIME, 
             getattr(self, 'shield_buff_timer', 0), getattr(game_settings, 'MAX_SHIELD_TIME', 2400),
             self.dino.sword_charges,
-            "T"
+            sword_key_str
         )
 
         pygame.display.flip()

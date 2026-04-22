@@ -315,15 +315,29 @@ class UILayer:
             
             current_y += spacing
 
-        # 4. Vẽ Số lần chém Kiếm (Text đơn giản)
+        # 4. Vẽ Số lần chém Kiếm
         if sword_charges > 0:
-            # Bạn có thể thay bằng icon thanh kiếm nếu đã load ảnh ở assets
-            sword_text = self.font_med.render(
-                f"Swords: {sword_charges} (press {sword_key} to use)",
-                True,
-                (255, 100, 100)
-            )
-            self.screen.blit(sword_text, (start_x, current_y))
+            from src.assets_loader import get_item_sprite
+            sword_sprite = get_item_sprite('sword')
+            
+            if sword_key:
+                text_str = f"x {sword_charges} (press {sword_key} to use)"
+            else:
+                text_str = f"x {sword_charges}"
+                
+            sword_text = self.font_med.render(text_str, True, (255, 100, 100))
+            
+            if sword_sprite:
+                sword_sprite = pygame.transform.scale(sword_sprite, (40, 40))
+                self.screen.blit(sword_sprite, (start_x, current_y - 2))
+                self.screen.blit(sword_text, (start_x + sword_sprite.get_width() + 5, current_y))
+            else:
+                if sword_key:
+                    fallback_str = f"Swords: {sword_charges} (press {sword_key} to use)"
+                else:
+                    fallback_str = f"Swords: {sword_charges}"
+                fallback_text = self.font_med.render(fallback_str, True, (255, 100, 100))
+                self.screen.blit(fallback_text, (start_x, current_y))
         
 
 

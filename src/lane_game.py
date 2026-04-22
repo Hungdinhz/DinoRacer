@@ -384,6 +384,17 @@ class LaneGame:
             self.dino.set_duck(duck > 0.5)
             if duck > 0.5 and not self.dino.is_jumping:
                 actual_action = (actual_action[0], 1)
+                
+            # --- AI Sword Logic ---
+            if self.dino.sword_charges > 0:
+                from src.obstacle import Bird
+                dino_right = self.dino.x + self.dino.width
+                for obs in self.obstacles:
+                    if isinstance(obs, Bird) and (self.dino.y - obs.y) > 50:
+                        continue
+                    if 0 < (obs.x - dino_right) < 50:
+                        self.sword_slash()
+                        break
         # Handle player action (from keyboard)
         elif player_action is not None:
             jump, duck = player_action
@@ -579,13 +590,17 @@ class LaneGame:
 
         self.draw_notifications(surf)
 
+        display_sword_key = self.sword_key
+        if 'AI' in self.label:
+            display_sword_key = ""
+
         from config.settings import MAX_SHIELD_TIME
         self.ui.draw_buffs(
             self.speed_buff_timer, MAX_SPEED_TIME,
             self.x2_buff_timer, MAX_X2_TIME,
             getattr(self, 'shield_buff_timer', 0), MAX_SHIELD_TIME,
             self.dino.sword_charges,
-            self.sword_key,
+            display_sword_key,
         )
 
         lbl = self.font_label.render(self.label, True, self.label_color)
