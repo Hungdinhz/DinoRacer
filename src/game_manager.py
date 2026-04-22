@@ -718,9 +718,6 @@ class GameManager:
             
         self._draw_achievement_popup()
         
-        pygame.draw.rect(self.screen, (0, 255, 0), self.dino.get_rect(), 2)
-        for obs in self.obstacles:
-            pygame.draw.rect(self.screen, (255, 0, 0), obs.get_rect(), 2)
 
         for item in self.items:
             item.draw(self.screen)

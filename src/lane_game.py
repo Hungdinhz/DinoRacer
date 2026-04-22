@@ -23,7 +23,7 @@ from src.ui import UILayer
 LANE_H = LANE_HEIGHT
 LANE_W = SCREEN_WIDTH
 GROUND_Y_LANE = LANE_H - 55   # mặt đất trong lane
-
+LOGIC_Y = GROUND_Y_LANE + 20  # Tọa độ vật lý: cộng 20px để hạ thấp toàn bộ vật thể
 SKY_TOP    = (100, 180, 230)
 SKY_BOT    = (255, 210, 120)
 GROUND_COL = (160, 120, 60)
@@ -128,7 +128,8 @@ class LaneGame:
         from config.settings import DINO_HEIGHT
         # Set ground_y BEFORE setting y position
         self.dino.ground_y = GROUND_Y_LANE
-        self.dino.y = GROUND_Y_LANE - DINO_HEIGHT
+        self.dino.ground_y = LOGIC_Y
+        self.dino.y = LOGIC_Y - DINO_HEIGHT
         # Debug: Invalidate cached rect
         self.dino._cached_rect = None
 
@@ -210,10 +211,13 @@ class LaneGame:
             obs = create_obstacle(LANE_W + 50, speed)
             from src.obstacle import Cactus, Bird
             if isinstance(obs, Cactus):
-                obs.y = GROUND_Y_LANE - obs.height
-            else:
+                # Xương rồng lún xuống chạm mặt cỏ
+                obs.y = LOGIC_Y - obs.height
+                
+            elif isinstance(obs, Bird):
+                # CÁCH A: Trả chim về lại đúng độ cao cũ (Dùng GROUND_Y_LANE)
                 from config.settings import GROUND_Y
-                ratio = GROUND_Y_LANE / GROUND_Y
+                ratio = GROUND_Y_LANE / GROUND_Y 
                 obs.y = int(obs.y * ratio)
             self.obstacles.append(obs)
             self.last_obstacle_x = obs.x
@@ -423,7 +427,7 @@ class LaneGame:
 
         self.game_speed = OBSTACLE_SPEED_MIN + (self.score // SPEED_INCREASE_INTERVAL) * SPEED_INCREASE_AMOUNT
         self.game_speed = min(self.game_speed, OBSTACLE_SPEED_MAX)
-        self.bg_index = min(1 + self.score // 50, 5)
+        self.bg_index = min(1 + self.score // 200, 5)
 
         # 1. Spawn coins if enough space
         start_coin_x = LANE_W + 50
@@ -443,7 +447,7 @@ class LaneGame:
                     coin_x = start_coin_x + i * 50
                     coin_speed = self.game_speed
                     coin = Coin(coin_x, coin_speed)
-                    coin.y = GROUND_Y_LANE - coin.height - 20
+                    coin.y = LOGIC_Y - coin.height - 20
                     self.items.append(coin)
 
         # 2. Update items and collect
@@ -497,7 +501,7 @@ class LaneGame:
                     item = X2Item(item_x, self.game_speed)
                 else:
                     item = SwordItem(item_x, self.game_speed)
-                item.y = GROUND_Y_LANE - item.height
+                item.y = LOGIC_Y - item.height
                 self.items.append(item)
                 self.last_item_x = item_x
                 self.next_spawn_items_score += 50
@@ -546,8 +550,8 @@ class LaneGame:
             surf.blit(bg, (LANE_W - ox, 0))
 
         fog = pygame.Surface((LANE_W, LANE_H), pygame.SRCALPHA)
-        # Số 90 cuối cùng là độ mờ (0-255). Càng cao thì BG càng bị che mờ!
-        fog.fill((200, 220, 240, 90)) 
+        # Số cuối cùng là độ mờ (0-255). Càng cao thì BG càng bị che mờ!
+        fog.fill((200, 220, 240, 150)) 
         surf.blit(fog, (0, 0))
         
         for c in self.clouds:
