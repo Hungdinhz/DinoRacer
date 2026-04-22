@@ -583,11 +583,13 @@ class GameManager:
                 self.particles.append(Particle(rect.centerx, rect.centery))
             h_cur = self.highscore_ai if self.is_ai_mode else self.highscore_human
             if self.score > h_cur:
-                if self.is_ai_mode:
+                if getattr(self, 'is_ai_mode', False):
                     self.highscore_ai = self.score
+                    self.ui.highscore = self.score
                     save_highscore(ai=self.score)
                 else:
                     self.highscore_human = self.score
+                    self.ui.highscore = self.score
                     save_highscore(human=self.score)
             # Kiểm tra và trigger achievements
             newly = check_achievements(score=self.score, obstacles=self.score)
@@ -647,15 +649,19 @@ class GameManager:
         # Sử dụng cached HUD background
         self.screen.blit(get_hud_bg_surface(), (self._half_screen - 130, 5))
 
-        score_txt = self.font_hud.render(f"SCORE  {self.score:05d}", True, (255, 230, 80))
-        hi_txt    = self.font_hud.render(f"HI  {h:05d}", True, (200, 200, 200))
+        score_label = self.font_hud.render("SCORE", True, (255, 230, 80))
+        score_val   = self.font_hud.render(f"{self.score:05d}", True, (255, 230, 80))
+        hi_label    = self.font_hud.render("HI", True, (200, 200, 200))
+        hi_val      = self.font_hud.render(f"{h:05d}", True, (200, 200, 200))
         
         prog_percent = min(100, int((self.score / 1500) * 100))
         prog_txt  = self.font_speed.render(f"DEST {prog_percent}%", True, (0, 200, 255))
         
-        self.screen.blit(score_txt, (self._half_screen - 118, 12))
-        self.screen.blit(hi_txt,    (self._half_screen - 118, 38))
-        self.screen.blit(prog_txt,  (self._half_screen + 30,  38))
+        self.screen.blit(score_label, (self._half_screen - 118, 12))
+        self.screen.blit(score_val,   (self._half_screen - 30, 12))
+        self.screen.blit(hi_label,    (self._half_screen - 118, 38))
+        self.screen.blit(hi_val,      (self._half_screen - 30, 38))
+        self.screen.blit(prog_txt,    (self._half_screen + 30,  38))
 
         # Progress bar
         bar_x, bar_y, bar_w, bar_h = self._half_screen + 30, 14, 90, 10
